@@ -54,20 +54,20 @@ function toolIcon(name: string): ReactNode {
   }
 }
 
-/** Per-tool action phrase for the aggregate header: `edit 1 file, read 1 file`. */
+/** Per-tool action phrase for the aggregate header: `Edit 1 file, Read 1 file`. */
 function actionPhrase(name: string, count: number): string {
   const noun = (base: string): string => count > 1 ? `${base}s` : base
   switch (name) {
-    case 'edit': return `edit ${count} ${noun('file')}`
-    case 'write': return `create ${count} ${noun('file')}`
-    case 'read': case 'read_image': return `read ${count} ${noun('file')}`
-    case 'web_fetch': return `fetch ${count} ${noun('page')}`
-    case 'web_search': return `search ${count} ${noun('time')}`
-    case 'grep': return `search ${count} ${noun('pattern')}`
-    case 'glob': return `list ${count} ${noun('path')}`
-    case 'bash': case 'pwsh': return count > 1 ? `run ${count} commands` : 'run 1 command'
-    case 'run_code': return `run ${count} ${noun('program')}`
-    case 'todo_write': return `update ${count} ${noun('todo list')}`
+    case 'edit': return `Edit ${count} ${noun('file')}`
+    case 'write': return `Create ${count} ${noun('file')}`
+    case 'read': case 'read_image': return `Read ${count} ${noun('file')}`
+    case 'web_fetch': return `Fetch ${count} ${noun('page')}`
+    case 'web_search': return `Search ${count} ${noun('time')}`
+    case 'grep': return `Search ${count} ${noun('pattern')}`
+    case 'glob': return `List ${count} ${noun('path')}`
+    case 'bash': case 'pwsh': return count > 1 ? `Run ${count} commands` : 'Run 1 command'
+    case 'run_code': return `Run ${count} ${noun('program')}`
+    case 'todo_write': return `Update ${count} ${noun('todo list')}`
     default: {
       const pretty = name.charAt(0).toUpperCase() + name.slice(1)
       return count > 1 ? `${pretty} ×${count}` : pretty
