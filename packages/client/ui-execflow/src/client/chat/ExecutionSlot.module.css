@@ -27,7 +27,6 @@
 .aggregate {
   display: flex;
   align-items: center;
-  gap: 8px;
   height: 24px;
   font-size: 14px;
   line-height: 24px;
@@ -57,14 +56,18 @@
 }
 
 /* Leading seat: the LAST member's tool icon by default; hover swaps it for
-   the expand chevron (the disclosure affordance appears on intent). */
+   the expand chevron (the disclosure affordance appears on intent). Mirrors
+   DisclosureRow's leading box exactly (16px + 6px gap) so header and expanded
+   rows align to the pixel. */
 .leading {
   position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
-  width: 14px;
-  height: 14px;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
   color: inherit;
 }
 

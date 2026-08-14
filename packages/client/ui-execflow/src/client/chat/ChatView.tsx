@@ -19,6 +19,7 @@ import type { ChatViewSlotProps } from '../contract/execflow-slots.ts'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { ExecutionSlot, type SlotDrafting, type SlotMember } from './ExecutionSlot.tsx'
+import { ViewModeMenu } from './ViewModeMenu.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -105,7 +106,7 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
 }
 
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
-function TurnStatus({ startTime, t, thinkMode, onToggleThinkMode }: {
+function TurnStatus({ startTime, t, thinkMode, onToggleThinkMode, showThinkSwitch }: {
   /** The running turn's logged `turn/start` time; null falls back to mount
    *  time when that boundary is outside the window. */
   startTime: number | null
@@ -114,6 +115,8 @@ function TurnStatus({ startTime, t, thinkMode, onToggleThinkMode }: {
   /** Active think display form; the Thinking chip switches it live. */
   thinkMode: ThinkMode
   onToggleThinkMode: () => void
+  /** Only while the model is thinking right now (streaming reasoning blocks). */
+  showThinkSwitch: boolean
 }) {
   const [mountedAt] = useState(() => Date.now())
   // Anchored to turn/start so a mid-turn reload keeps the real
@@ -139,15 +142,17 @@ function TurnStatus({ startTime, t, thinkMode, onToggleThinkMode }: {
           {formatRunDuration(elapsedMs, t)}
         </span>
       )}
-      <button
-        type="button"
-        className={css.thinkToggle}
-        aria-pressed={thinkMode === 'compact'}
-        title={thinkMode === 'compact' ? '显示 Thinking 内容' : '隐藏 Thinking 内容'}
-        onClick={onToggleThinkMode}
-      >
-        Thinking
-      </button>
+      {showThinkSwitch && (
+        <button
+          type="button"
+          className={css.thinkToggle}
+          aria-pressed={thinkMode === 'compact'}
+          title={thinkMode === 'compact' ? '显示 Thinking 内容' : '隐藏 Thinking 内容'}
+          onClick={onToggleThinkMode}
+        >
+          Thinking
+        </button>
+      )}
     </div>
   )
 }
@@ -188,6 +193,14 @@ export function ChatView({
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
   const [thinkMode, setThinkMode] = useState<ThinkMode>(readThinkMode)
+  const writeThinkMode = useCallback((next: ThinkMode) => {
+    setThinkMode(next)
+    try {
+      window.localStorage.setItem(THINK_MODE_KEY, next)
+    } catch {
+      // Persistence failure keeps the in-memory mode for this session.
+    }
+  }, [])
   const toggleThinkMode = useCallback(() => {
     setThinkMode((previous) => {
       const next: ThinkMode = previous === 'inline' ? 'compact' : 'inline'
@@ -539,6 +552,8 @@ export function ChatView({
 
   return (
     <div className={css.root}>
+      {/* Display-mode picker (Normal / Think), pinned at the view's top-right. */}
+      <ViewModeMenu thinkMode={thinkMode} onSetMode={writeThinkMode} />
       <div ref={listRef} className={css.scroll}>
         <div ref={columnRef} className={css.column} data-chat-flow="">
           {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
@@ -582,13 +597,16 @@ export function ChatView({
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}
           {/* Turn-level loading signal: rides the whole running turn (first-token
-              wait, tool execution, streaming) so it never flickers per step. */}
+              wait, tool execution, streaming) so it never flickers per step.
+              The Thinking switch shows only while the model is actually
+              thinking this moment (streaming reasoning blocks in the partial). */}
           {running && (
             <TurnStatus
               startTime={runningTurnStart}
               t={t}
               thinkMode={thinkMode}
               onToggleThinkMode={toggleThinkMode}
+              showThinkSwitch={partial !== null && partial.blocks.some(block => block.kind === 'reasoning')}
             />
           )}
           {pendingSteering.map(item => (
