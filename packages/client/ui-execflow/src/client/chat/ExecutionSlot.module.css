@@ -31,13 +31,13 @@
   height: 24px;
   font-size: 14px;
   line-height: 24px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   user-select: none;
 }
 
 .aggregate:hover {
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-primary);
 }
 
 /* Live aggregate (a member settled but siblings still running): reads as
