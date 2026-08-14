@@ -125,8 +125,18 @@ export function apply(ctx: Context): void {
         return conversation.resolveImage(sessionId, attachment)
       },
       inspectCall: (callId) => {
+        // The view ring reads the OFFICIAL chat store (ui-conversation's
+        // per-session instance), which this plugin cannot write from outside;
+        // writing our own store would be a silent no-op. The jump therefore
+        // drives the ring the way a user does: a real click on the official
+        // "轨迹" tab (BoundActions.setView through the header's own handler),
+        // which works identically on stock dsh. The call-focus handoff the
+        // official chat tab enjoys (setInspect) is not reachable without an
+        // upstream API; the trajectory opens without the pre-selected call.
         actions.setInspect({ callId })
-        actions.setView('trajectory')
+        const tabs = [...document.querySelectorAll('[role="tab"]')]
+        const trajectoryTab = tabs.find(tab => (tab.textContent || '').trim() === '轨迹')
+        if (trajectoryTab instanceof HTMLElement) trajectoryTab.click()
       },
       chatScroll: {
         save: (position) => {
