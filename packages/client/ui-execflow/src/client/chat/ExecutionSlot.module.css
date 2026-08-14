@@ -11,12 +11,13 @@
   min-height: 24px;
 }
 
-/* Expanded body: earlier members under the header, plain stack — no rail
-   (the rows carry their own affordances). */
+/* Expanded body: earlier members under the header, stacked at the official
+   chat tab's flow rhythm (the 16px column gap) so expanded rows read at the
+   same density as the conversation flow itself. */
 .body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 16px;
   margin: 2px 0;
 }
 
