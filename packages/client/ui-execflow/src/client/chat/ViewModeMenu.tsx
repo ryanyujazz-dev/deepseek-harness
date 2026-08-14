@@ -101,7 +101,7 @@ export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
             aria-expanded={open}
             onClick={() => { setOpen(v => !v) }}
           >
-            <IconEllipsisOutline16 size={16} />
+            <IconEllipsisOutline16 />
           </button>
         )}
         items={items}
