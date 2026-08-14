@@ -105,12 +105,15 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
 }
 
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
-function TurnStatus({ startTime, t }: {
+function TurnStatus({ startTime, t, thinkMode, onToggleThinkMode }: {
   /** The running turn's logged `turn/start` time; null falls back to mount
    *  time when that boundary is outside the window. */
   startTime: number | null
   /** The owning view's locale seat. */
   t: ChatViewSlotProps['t']
+  /** Active think display form; the Thinking chip switches it live. */
+  thinkMode: ThinkMode
+  onToggleThinkMode: () => void
 }) {
   const [mountedAt] = useState(() => Date.now())
   // Anchored to turn/start so a mid-turn reload keeps the real
@@ -136,8 +139,32 @@ function TurnStatus({ startTime, t }: {
           {formatRunDuration(elapsedMs, t)}
         </span>
       )}
+      <button
+        type="button"
+        className={css.thinkToggle}
+        aria-pressed={thinkMode === 'compact'}
+        title={thinkMode === 'compact' ? '显示 Thinking 内容' : '隐藏 Thinking 内容'}
+        onClick={onToggleThinkMode}
+      >
+        Thinking
+      </button>
     </div>
   )
+}
+
+/** Think display form: inline ReasoningRows in the flow (A) vs hidden from the
+ * flow entirely — content-anchored aggregation (B). Persisted per browser. */
+export type ThinkMode = 'inline' | 'compact'
+
+const THINK_MODE_KEY = 'dsh.execflow.think-mode'
+
+function readThinkMode(): ThinkMode {
+  try {
+    const value = window.localStorage.getItem(THINK_MODE_KEY)
+    return value === 'compact' ? 'compact' : 'inline'
+  } catch {
+    return 'inline'
+  }
 }
 
 /**
@@ -160,6 +187,18 @@ export function ChatView({
   const hasMore = useSession(s => s.hasMore)
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
+  const [thinkMode, setThinkMode] = useState<ThinkMode>(readThinkMode)
+  const toggleThinkMode = useCallback(() => {
+    setThinkMode((previous) => {
+      const next: ThinkMode = previous === 'inline' ? 'compact' : 'inline'
+      try {
+        window.localStorage.setItem(THINK_MODE_KEY, next)
+      } catch {
+        // Persistence failure keeps the in-memory mode for this session.
+      }
+      return next
+    })
+  }, [])
 
   const pendingSteering = useMemo(
     () => inbox.filter(item => item.placement === 'steering'),
@@ -167,9 +206,13 @@ export function ChatView({
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
 
-  // ExecFlow single-slot partitioning: contiguous tool-call nodes sharing one
-  // (turn, step) form one execution run rendered through ExecutionSlot (one
-  // morphing header, expandable body). Every other node renders as before.
+  // ExecFlow single-slot partitioning: contiguous tool-call nodes form one
+  // execution run rendered through ExecutionSlot (one morphing header,
+  // expandable body). The anchor depends on the think form — inline: a node
+  // splits runs whenever it renders ANY visible flow content (think rows
+  // included), so runs stay step-scoped; compact: think renders nothing, so
+  // only content-bearing nodes (text/images, user bubbles, errors) split —
+  // runs aggregate across steps between content anchors.
   const partial = useSession(s => s.partial)
   const flow = useMemo(() => {
     type Entry =
@@ -196,21 +239,31 @@ export function ChatView({
       const root = (node.data as { root?: object }).root
       return root !== undefined && typeof root === 'object' && !('kind' in root)
     }
+    /** Whether one assistant-step node renders visible flow content in the
+     * active think form (its tool-call blocks never render inline). */
+    const stepHasVisibleContent = (nodeKey: string): boolean => {
+      const node = nodeStore.get(nodeKey)
+      if (node === undefined || node.kind !== 'assistant-step') return true
+      const blocks = (node.data as { blocks: readonly { kind: string }[] }).blocks
+      // Compact form: reasoning renders nothing, so a reasoning-only step is
+      // transparent — its tools merge with the surrounding run.
+      return thinkMode === 'inline'
+        ? blocks.some(block => block.kind !== 'tool-call')
+        : blocks.some(block => block.kind !== 'tool-call' && block.kind !== 'reasoning')
+    }
     for (const nodeKey of order) {
       const node = nodeStore.get(nodeKey)
       const name = node !== undefined ? toolNameOf(nodeKey) : undefined
       const isTool = name !== undefined
       const last = entries[entries.length - 1]
       const location = node?.location
-      // Contiguity is the primary rule (never reorder); the turn number only
-      // prevents a run from bleeding across a same-step tool dispatched after
-      // a narrative split. Location kinds may mix (turn- vs step-scoped), so
-      // the join key is just the turn.
       const turn = location?.kind === 'step' || location?.kind === 'turn'
         ? location.turn.turn
         : null
       const lastRun = last?.kind === 'run' ? last : undefined
       const lastMember = lastRun?.members[lastRun.members.length - 1]
+      // Content anchor: a run extends through nodes that are invisible in the
+      // active form (transparent), and never across a different turn.
       if (isTool && lastRun !== undefined && lastMember !== undefined && turn !== null) {
         const lastLocation = nodeStore.get(lastMember.nodeKey)?.location
         const lastTurn = lastLocation?.kind === 'step' || lastLocation?.kind === 'turn'
@@ -229,6 +282,12 @@ export function ChatView({
           stepStart: stepLocation?.start?.time ?? null,
           stepEnd: stepLocation?.end?.time ?? null,
         })
+        continue
+      }
+      // A transparent node (think-only assistant step in compact form) neither
+      // splits the flow nor renders — skip it entirely so the surrounding runs
+      // join. Everything else is a visible anchor that splits runs.
+      if (node !== undefined && node.kind === 'assistant-step' && !stepHasVisibleContent(nodeKey)) {
         continue
       }
       entries.push({ kind: 'node', nodeKey })
@@ -262,12 +321,13 @@ export function ChatView({
       }
     }
     return { entries, drafting: draftingForLastRun ? drafting : [] }
-  }, [order, nodeStore, partial])
+  }, [order, nodeStore, partial, thinkMode])
 
   /** One member's full row through the node seat (running or settled styling). */
   const renderMember = useCallback((nodeKey: string) => (
     <ChatNodeSeat
       nodeKey={nodeKey}
+      thinkMode={thinkMode}
       useSession={useSession}
       selectedCallId={selectedCallId}
       cwd={cwd}
@@ -279,7 +339,7 @@ export function ChatView({
       renderSlot={renderSlot}
       t={t}
     />
-  ), [useSession, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions, renderSlot, t])
+  ), [useSession, thinkMode, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions, renderSlot, t])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -498,6 +558,7 @@ export function ChatView({
             <ChatNodeSeat
               key={entry.nodeKey}
               nodeKey={entry.nodeKey}
+              thinkMode={thinkMode}
               useSession={useSession}
               selectedCallId={selectedCallId}
               cwd={cwd}
@@ -522,7 +583,14 @@ export function ChatView({
               double-render the same wait. */}
           {/* Turn-level loading signal: rides the whole running turn (first-token
               wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
+          {running && (
+            <TurnStatus
+              startTime={runningTurnStart}
+              t={t}
+              thinkMode={thinkMode}
+              onToggleThinkMode={toggleThinkMode}
+            />
+          )}
           {pendingSteering.map(item => (
             <PendingSteeringBubble key={item.id} content={item.content} loadImage={loadImage} t={t} />
           ))}

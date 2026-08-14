@@ -92,6 +92,8 @@ export interface ChatNodeOwnerProps {
   /** Resolve a session-authorized historical image for inline display. */
   loadImage: (attachment: ImageAttachmentRef) => Promise<string>
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
+  /** Active think display form: 'compact' hides reasoning blocks downstream. */
+  thinkMode?: 'inline' | 'compact' | undefined
 }
 
 /** Full props of one registered keyed ExecFlow business renderer. */

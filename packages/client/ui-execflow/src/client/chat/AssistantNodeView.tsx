@@ -4,7 +4,7 @@ import { AssistantMarkdown } from './AssistantMarkdown.tsx'
 
 /** Streaming, settled, and interrupted Assistant states share one keyed renderer instance. */
 export const AssistantNodeView = memo(function AssistantNodeView({
-  node, useTurnData, openFile, loadImage, fileMentions, t,
+  node, useTurnData, openFile, loadImage, fileMentions, thinkMode, t,
 }: ChatNodeViewProps<'assistant-step'>) {
   const data = node.data
   const turn = node.location.kind === 'turn' || node.location.kind === 'step'
@@ -20,9 +20,15 @@ export const AssistantNodeView = memo(function AssistantNodeView({
     () => owner === undefined ? undefined : fileMentions(owner),
     [fileMentions, owner],
   )
+  const blocks = useMemo(
+    () => thinkMode === 'compact'
+      ? data.blocks.filter(block => block.kind !== 'reasoning')
+      : data.blocks,
+    [data.blocks, thinkMode],
+  )
   return (
     <AssistantMarkdown
-      blocks={data.blocks}
+      blocks={blocks}
       streaming={data.status === 'running'}
       interrupted={data.status === 'interrupted'}
       loadImage={loadImage}
