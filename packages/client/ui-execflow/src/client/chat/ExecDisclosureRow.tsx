@@ -7,7 +7,7 @@
  */
 import { type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutline14, IconChevronRightOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './ExecDisclosureRow.module.css'
 
 /** Shared 24px disclosure chrome for compact flow rows. */
@@ -62,12 +62,17 @@ export function ExecDisclosureRow({
     onToggle()
   }
   // The single deviation from the primitive: the icon stays in every state;
-  // the chevron is a hover overlay always (never the resting glyph).
+  // the chevron is a hover overlay always (never the resting glyph) and its
+  // direction tells the click's effect — right while collapsed (opens),
+  // down while expanded (closes).
+  const hoverChevron = open
+    ? <IconChevronDownOutline14 className={clsx(chevronClassName, css.chevronHover)} />
+    : <IconChevronRightOutline14 className={clsx(chevronClassName, css.chevronHover)} />
   const leading = expandable
     ? (
       <>
         <span className={css.iconIdle}>{icon}</span>
-        <IconChevronDownOutline14 className={clsx(chevronClassName, css.chevronHover)} />
+        {hoverChevron}
       </>
     )
     : icon

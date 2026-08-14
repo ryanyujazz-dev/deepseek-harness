@@ -16,7 +16,7 @@
   --dsl-terminal-font: var(--dsw-font-markdown-code-block-small);
   --dsl-terminal-line-height: 18px;
   --dsl-terminal-output-max-height: 224px;
-  margin: 4px 0 4px 4px;
+  margin: 4px 0 4px 22px;
   border: 1px solid var(--dsw-alias-border-l1);
 }
 
@@ -26,7 +26,7 @@
 .ioCard {
   display: flex;
   flex-direction: column;
-  margin: 4px 0 4px 4px;
+  margin: 4px 0 4px 22px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 12px;
   background: var(--dsw-alias-markdown-code-block);
