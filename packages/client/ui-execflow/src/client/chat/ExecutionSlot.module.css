@@ -12,13 +12,13 @@
 }
 
 /* Expanded body: earlier members under the header, stacked at the official
-   chat tab's flow rhythm (the 16px column gap) so expanded rows read at the
-   same density as the conversation flow itself. */
+   chat tab's flow rhythm (the 16px column gap) — including the header-to-
+   first-row distance, so the whole expanded block reads as one column. */
 .body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  margin: 2px 0;
+  margin: 16px 0 0;
 }
 
 /* Aggregate header row: 24px. While any member still runs the aggregate is
