@@ -1,11 +1,14 @@
 /**
- * ViewModeMenu: the execflow tab's display-mode picker (vertical ellipsis at
- * the view's top-right). Normal = think rows inline in the flow (form A);
- * Think = compact form (think hidden, content-anchored aggregation). The
- * choice rides the same persisted thinkMode as the running-turn Thinking
- * switch, so both entry points always agree.
+ * ViewModeMenu: the execflow view's display-mode picker — a horizontal
+ * ellipsis pinned at the view's top-LEFT, floating over the flow (does not
+ * scroll with content).
+ *
+ * Normal = the execution-only form (think hidden, content-anchored
+ * aggregation). Think = think content rendered in the flow, expanded by
+ * default. Both ride the same persisted thinkMode as the running-turn
+ * Thinking switch, so both entry points always agree.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { IconEllipsisOutline16, Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ThinkMode } from './ChatView.tsx'
 import css from './ViewModeMenu.module.css'
@@ -20,7 +23,6 @@ interface ViewModeMenuProps {
 /** The execflow display-mode picker. */
 export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
 
   // Close on Escape while open (Menu's own outside-click handles the rest).
   useEffect(() => {
@@ -34,12 +36,12 @@ export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
 
   const items: MenuEntry[] = [
     { type: 'label', id: 'display', text: '显示方式' },
-    { id: 'inline', label: 'Normal', icon: undefined },
-    { id: 'compact', label: 'Think' },
+    { id: 'compact', label: 'Normal' },
+    { id: 'inline', label: 'Think' },
   ]
 
   return (
-    <div className={css.root} ref={rootRef}>
+    <div className={css.root}>
       <Menu
         open={open}
         anchor={(
@@ -61,7 +63,7 @@ export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
           setOpen(false)
         }}
         onClose={() => { setOpen(false) }}
-        align="end"
+        align="start"
       />
     </div>
   )

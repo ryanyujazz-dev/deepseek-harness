@@ -33,6 +33,7 @@ export const AssistantNodeView = memo(function AssistantNodeView({
       interrupted={data.status === 'interrupted'}
       loadImage={loadImage}
       mentions={mentions}
+      thinkExpanded={thinkMode === 'inline'}
       t={t}
     />
   )
