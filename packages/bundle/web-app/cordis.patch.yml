@@ -273,6 +273,11 @@
     - id: ui-trajectory
       name: '@deepseek-ai/dsh-client-ui-trajectory'
 
+    # ExecFlow view tab: the chat stream with explicit per-tool START/DONE
+    # rows (pure consumer of the conversation view registry).
+    - id: ui-execflow
+      name: '@deepseek-ai/dsh-client-ui-execflow'
+
 # ── the agent plane moves behind agent presets ─────────────────────────────
 #
 # Every row below composes what ONE agent contributes to the host registries:
