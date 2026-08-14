@@ -1,4 +1,6 @@
-/* View-mode picker: pinned to the view's top-left, floating over the flow. */
+/* View-mode picker: portaled into the session scrollport, anchored to its
+   top-left. The scrollport itself never moves, so the trigger stays pinned
+   over the scrolling transcript. */
 .root {
   position: absolute;
   top: 6px;
