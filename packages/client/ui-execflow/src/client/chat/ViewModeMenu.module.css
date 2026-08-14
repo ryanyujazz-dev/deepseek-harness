@@ -1,11 +1,8 @@
-/* View-mode picker: portaled into the session scrollport, anchored to its
-   top-left. The scrollport itself never moves, so the trigger stays pinned
-   over the scrolling transcript. */
+/* View-mode picker: portaled to document.body, fixed at the conversation
+   scrollport's top-left viewport coordinates (owner-measured). */
 .root {
-  position: absolute;
-  top: 6px;
-  left: 12px;
-  z-index: 5;
+  position: fixed;
+  z-index: 20;
 }
 
 .trigger {
@@ -14,6 +11,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
+  margin: 6px 0 0 12px;
   border: none;
   border-radius: 4px;
   background: none;

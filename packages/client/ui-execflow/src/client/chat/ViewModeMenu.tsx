@@ -1,11 +1,14 @@
 /**
  * ViewModeMenu: the execflow view's display-mode picker — a horizontal
- * ellipsis floating at the view's top-left, STICKING there while the
- * transcript scrolls. The real scrollport is the session skeleton's
- * [data-conversation-scroll] host (this view's own .scroll is inert when
- * nested there), so an absolutely-positioned child of the view scrolls away
- * with the content; the trigger is therefore portaled into the scrollport
- * itself and anchored to its top-left. Unmounts with the view (tab-only).
+ * ellipsis floating at the CONVERSATION COLUMN's top-left, sticking there
+ * while the transcript scrolls.
+ *
+ * Positioning: the transcript's real scrollport ([data-conversation-scroll])
+ * may not be a positioned ancestor, so an absolute child anchors against the
+ * window instead. The trigger is portaled into the scrollport and positioned
+ * FIXED at the scrollport's live top-left viewport coordinates (measured at
+ * mount and on window resize; the scrollport itself never scrolls, so fixed
+ * coordinates stay valid). Unmounts with the view (execflow-tab-only).
  *
  * Normal = the execution-only form (think hidden, content-anchored
  * aggregation). Think = think content rendered in the flow, expanded by
@@ -25,17 +28,46 @@ interface ViewModeMenuProps {
   onSetMode: (mode: ThinkMode) => void
 }
 
+/** Viewport coordinates of the scrollport's top-left. */
+interface AnchorPosition {
+  readonly left: number
+  readonly top: number
+}
+
 /** The execflow display-mode picker. */
 export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
   const [open, setOpen] = useState(false)
-  const [host, setHost] = useState<HTMLElement | null>(null)
+  const [anchor, setAnchor] = useState<AnchorPosition | null>(null)
 
-  // Resolve the owning scrollport once mounted: the nearest
-  // [data-conversation-scroll] ancestor (the session's real scrollport), or
-  // this view's own scroller when mounted standalone (unit tests).
+  // Measure the scrollport's top-left in viewport coordinates. The layout
+  // settles asynchronously (session open, sidebar animations), so measure on
+  // mount, on window resize, and through a ResizeObserver on the scrollport
+  // itself — the observer catches every geometry change regardless of cause.
   useEffect(() => {
+    const measure = (): void => {
+      const scroller = document.querySelector('[data-conversation-scroll]')
+      if (!(scroller instanceof HTMLElement)) {
+        setAnchor(null)
+        return
+      }
+      const rect = scroller.getBoundingClientRect()
+      setAnchor(previous =>
+        previous !== null && previous.left === rect.left && previous.top === rect.top
+          ? previous
+          : { left: rect.left, top: rect.top })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    let observer: ResizeObserver | undefined
     const scroller = document.querySelector('[data-conversation-scroll]')
-    setHost(scroller instanceof HTMLElement ? scroller : null)
+    if (scroller instanceof HTMLElement && typeof ResizeObserver === 'function') {
+      observer = new ResizeObserver(measure)
+      observer.observe(scroller)
+    }
+    return () => {
+      window.removeEventListener('resize', measure)
+      observer?.disconnect()
+    }
   }, [])
 
   // Close on Escape while open (Menu's own outside-click handles the rest).
@@ -54,8 +86,10 @@ export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
     { id: 'inline', label: 'Think' },
   ]
 
-  const trigger = (
-    <div className={css.root}>
+  if (anchor === null) return null
+
+  return createPortal(
+    <div className={css.root} style={{ left: anchor.left, top: anchor.top }}>
       <Menu
         open={open}
         anchor={(
@@ -79,11 +113,7 @@ export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
         onClose={() => { setOpen(false) }}
         align="start"
       />
-    </div>
+    </div>,
+    document.body,
   )
-
-  // Before the host resolves (first paint), render nothing rather than a
-  // scrolling-away placeholder.
-  if (host === null) return null
-  return createPortal(trigger, host)
 }
