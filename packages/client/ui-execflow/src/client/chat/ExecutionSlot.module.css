@@ -59,7 +59,9 @@
 /* Leading seat: the LAST member's tool icon by default; hover swaps it for
    the expand chevron (the disclosure affordance appears on intent). Mirrors
    DisclosureRow's leading box exactly (16px + 6px gap) so header and expanded
-   rows align to the pixel. */
+   rows align to the pixel. The icon color pins to label-tertiary — the same
+   resting color as a single tool row's icon — instead of following the
+   header's (brighter) text color. */
 .leading {
   position: relative;
   display: inline-flex;
@@ -69,7 +71,7 @@
   width: 16px;
   height: 16px;
   margin-right: 6px;
-  color: inherit;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .leadingIcon,
