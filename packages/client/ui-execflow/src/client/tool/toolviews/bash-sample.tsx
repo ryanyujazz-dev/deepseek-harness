@@ -83,16 +83,15 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
     event.preventDefault()
     toggleExpand()
   }
-  const leading = open
-    ? <IconChevronDownOutline14 className={css.chevron} />
-    : expandable
-      ? (
-        <>
-          <span className={css.iconIdle}>{leadingFor(state)}</span>
-          <IconChevronDownOutline14 className={clsx(css.chevron, css.chevronHover)} />
-        </>
-      )
-      : leadingFor(state)
+  // ExecFlow: the icon stays in every state; the chevron is hover-only.
+  const leading = expandable
+    ? (
+      <>
+        <span className={css.iconIdle}>{leadingFor(state)}</span>
+        <IconChevronDownOutline14 className={clsx(css.chevron, css.chevronHover)} />
+      </>
+    )
+    : leadingFor(state)
   return (
     <div className={css.card}>
       <div

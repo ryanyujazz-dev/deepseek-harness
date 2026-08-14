@@ -79,15 +79,14 @@
   word-break: break-word;
 }
 
-/* 2px rail centered on x=8: placed at left 7px (= 8 - 1). */
+/* 1px rail centered on x=8 (hairline weight; placed at 7.5 = 8 - 0.5). */
 .thinkBody::before {
   content: '';
   position: absolute;
   top: 4px;
   bottom: 4px;
-  left: 7px;
-  width: 2px;
-  border-radius: 1px;
+  left: 7.5px;
+  width: 1px;
   background: var(--dsw-alias-border-l2);
   pointer-events: none;
 }

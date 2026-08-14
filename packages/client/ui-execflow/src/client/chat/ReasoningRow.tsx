@@ -1,7 +1,8 @@
 /** Assistant reasoning disclosure, independent of Tool-call presentation. */
 import { useEffect, useRef, useState } from 'react'
-import { DisclosureRow, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/execflow-slots.ts'
+import { ExecDisclosureRow } from './ExecDisclosureRow.tsx'
 import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
 import a11yCss from './accessibility.module.css'
 import css from './ReasoningRow.module.css'
@@ -46,7 +47,7 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
   return (
     <div className={css.root} data-variant="think" data-state={running ? 'running' : 'ok'}>
       {running && <span className={a11yCss.visuallyHidden}>{t('row.running')}</span>}
-      <DisclosureRow
+      <ExecDisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
         titleClassName={css.title}
@@ -65,7 +66,7 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
         )}
       >
         <div className={css.thinkBody}>{text}</div>
-      </DisclosureRow>
+      </ExecDisclosureRow>
     </div>
   )
 }
