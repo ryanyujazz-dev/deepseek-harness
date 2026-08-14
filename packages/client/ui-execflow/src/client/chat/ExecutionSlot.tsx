@@ -91,8 +91,6 @@ interface ExecutionSlotProps {
   readonly members: readonly SlotMember[]
   /** Drafting blocks in the partial (chronological), if the run is streaming. */
   readonly drafting: readonly SlotDrafting[]
-  /** Run duration: first member's start → last member's end (ms), when closed. */
-  readonly durationMs: number | null
   /** Renders one member's full row (running or settled) inside the slot. */
   readonly renderMember: (nodeKey: string) => ReactNode
 }

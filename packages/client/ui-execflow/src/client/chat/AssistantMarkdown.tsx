@@ -73,7 +73,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
             key={i}
             text={block.text}
             running={streaming && i === last}
-            defaultExpanded={thinkExpanded}
+            defaultExpanded={thinkExpanded ?? false}
             t={t}
           />,
         )
