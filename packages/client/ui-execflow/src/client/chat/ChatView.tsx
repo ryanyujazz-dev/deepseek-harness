@@ -12,12 +12,13 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/execflow-slots.ts'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { ExecutionSlot, type SlotDrafting, type SlotMember } from './ExecutionSlot.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -165,6 +166,120 @@ export function ChatView({
     [inbox],
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
+
+  // ExecFlow single-slot partitioning: contiguous tool-call nodes sharing one
+  // (turn, step) form one execution run rendered through ExecutionSlot (one
+  // morphing header, expandable body). Every other node renders as before.
+  const partial = useSession(s => s.partial)
+  const flow = useMemo(() => {
+    type Entry =
+      | { kind: 'node'; nodeKey: string }
+      | { kind: 'run'; members: SlotMember[]; stepStart: number | null; stepEnd: number | null }
+    const entries: Entry[] = []
+    const toolNameOf = (nodeKey: string): string | undefined => {
+      const node = nodeStore.get(nodeKey)
+      if (node === undefined || node.kind !== 'tool-call') return undefined
+      const root = (node.data as { root?: object }).root
+      if (root === undefined || typeof root !== 'object') return ''
+      // Running form carries `name`; the settled ToolResultNode carries it
+      // under `call.name`. Both are run members.
+      if (!('kind' in root)) {
+        const name = (root as { name?: unknown }).name
+        return typeof name === 'string' ? name : ''
+      }
+      const call = (root as { call?: { name?: unknown } }).call
+      return typeof call?.name === 'string' ? call.name : ''
+    }
+    const runningOf = (nodeKey: string): boolean => {
+      const node = nodeStore.get(nodeKey)
+      if (node === undefined || node.kind !== 'tool-call') return false
+      const root = (node.data as { root?: object }).root
+      return root !== undefined && typeof root === 'object' && !('kind' in root)
+    }
+    for (const nodeKey of order) {
+      const node = nodeStore.get(nodeKey)
+      const name = node !== undefined ? toolNameOf(nodeKey) : undefined
+      const isTool = name !== undefined
+      const last = entries[entries.length - 1]
+      const location = node?.location
+      // Contiguity is the primary rule (never reorder); the turn number only
+      // prevents a run from bleeding across a same-step tool dispatched after
+      // a narrative split. Location kinds may mix (turn- vs step-scoped), so
+      // the join key is just the turn.
+      const turn = location?.kind === 'step' || location?.kind === 'turn'
+        ? location.turn.turn
+        : null
+      const lastRun = last?.kind === 'run' ? last : undefined
+      const lastMember = lastRun?.members[lastRun.members.length - 1]
+      if (isTool && lastRun !== undefined && lastMember !== undefined && turn !== null) {
+        const lastLocation = nodeStore.get(lastMember.nodeKey)?.location
+        const lastTurn = lastLocation?.kind === 'step' || lastLocation?.kind === 'turn'
+          ? lastLocation.turn.turn
+          : null
+        if (turn === lastTurn) {
+          lastRun.members.push({ nodeKey, toolName: name, running: runningOf(nodeKey) })
+          continue
+        }
+      }
+      if (isTool) {
+        const stepLocation = location?.kind === 'step' ? location.step : undefined
+        entries.push({
+          kind: 'run',
+          members: [{ nodeKey, toolName: name, running: runningOf(nodeKey) }],
+          stepStart: stepLocation?.start?.time ?? null,
+          stepEnd: stepLocation?.end?.time ?? null,
+        })
+        continue
+      }
+      entries.push({ kind: 'node', nodeKey })
+    }
+    // Drafting blocks of the CURRENT partial belong to the streaming step:
+    // attach them to the LAST run entry only (a run of the same turn), or —
+    // before the first tool/call lands and the run entry exists — carry them
+    // as a pending run so the slot can render the drafting header.
+    const drafting: SlotDrafting[] = []
+    if (partial !== null) {
+      partial.blocks.forEach((block, index) => {
+        if (block.kind === 'tool-call' && block.name !== '') {
+          drafting.push({ name: block.name, index })
+        }
+      })
+    }
+    let draftingForLastRun = false
+    if (drafting.length > 0 && partial !== null) {
+      const last = entries[entries.length - 1]
+      const firstMember = last?.kind === 'run' ? last.members[0] : undefined
+      if (firstMember !== undefined) {
+        const lastLocation = nodeStore.get(firstMember.nodeKey)?.location
+        draftingForLastRun = (lastLocation?.kind === 'step' || lastLocation?.kind === 'turn')
+          && lastLocation.turn.turn === partial.turn
+      } else {
+        // No run yet for the streaming step (the last entry is a plain node or
+        // the flow is empty): create a pending (empty) run that renders the
+        // drafting header at the flow tail.
+        entries.push({ kind: 'run', members: [], stepStart: null, stepEnd: null })
+        draftingForLastRun = true
+      }
+    }
+    return { entries, drafting: draftingForLastRun ? drafting : [] }
+  }, [order, nodeStore, partial])
+
+  /** One member's full row through the node seat (running or settled styling). */
+  const renderMember = useCallback((nodeKey: string) => (
+    <ChatNodeSeat
+      nodeKey={nodeKey}
+      useSession={useSession}
+      selectedCallId={selectedCallId}
+      cwd={cwd}
+      openFile={openFile}
+      inspectCall={inspectCall}
+      forkAt={forkAt}
+      loadImage={loadImage}
+      fileMentions={fileMentions}
+      renderSlot={renderSlot}
+      t={t}
+    />
+  ), [useSession, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions, renderSlot, t])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -379,10 +494,10 @@ export function ChatView({
               </button>
             </div>
           )}
-          {order.map(nodeKey => (
+          {flow.entries.map((entry, index) => entry.kind === 'node' ? (
             <ChatNodeSeat
-              key={nodeKey}
-              nodeKey={nodeKey}
+              key={entry.nodeKey}
+              nodeKey={entry.nodeKey}
               useSession={useSession}
               selectedCallId={selectedCallId}
               cwd={cwd}
@@ -393,6 +508,16 @@ export function ChatView({
               fileMentions={fileMentions}
               renderSlot={renderSlot}
               t={t}
+            />
+          ) : (
+            <ExecutionSlot
+              key={`run:${entry.members[0]?.nodeKey ?? index}`}
+              members={entry.members}
+              drafting={flow.drafting}
+              durationMs={entry.stepStart !== null && entry.stepEnd !== null
+                ? Math.max(0, entry.stepEnd - entry.stepStart)
+                : null}
+              renderMember={renderMember}
             />
           ))}
           {/* No pending placeholders: questions (ui-user-questions) and approvals

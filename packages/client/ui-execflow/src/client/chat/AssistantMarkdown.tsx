@@ -17,7 +17,6 @@ import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives
 import { ImageGallery, type ImageLoader } from '@deepseek-ai/dsh-client-ui-attachment'
 import type { ChatViewSlotProps } from '../contract/execflow-slots.ts'
 import { messageImageLabels } from './image-labels.ts'
-import { DraftingToolRow, draftingEntry } from './DraftingToolRow.tsx'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import css from './AssistantMarkdown.module.css'
 
@@ -86,20 +85,12 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         rendered.push(<ImageGallery key={start} images={group} load={imageLoader} align="start" labels={messageImageLabels(t)} />)
         break
       }
-      // ExecFlow: while the partial streams, a long-drafting tool's block
-      // renders one live drafting row (Editing / Creating / …) at the exact
-      // position the durable tool-call row later occupies — the finalize +
-      // tool/call landing swaps content in place. Settled messages and
-      // short-drafting tools render nothing here, exactly as before.
-      case 'tool-call': {
-        if (streaming) {
-          const entry = draftingEntry(block.name)
-          if (entry !== undefined) {
-            rendered.push(<DraftingToolRow key={i} label={entry.label} icon={entry.icon} />)
-          }
-        }
+      // Tool-call blocks render through ExecutionSlot (the step's single
+      // morphing slot owns both the drafting and landed phases). The partial
+      // skips them here to avoid double rows; settled messages never carried
+      // them into markdown anyway.
+      case 'tool-call':
         break
-      }
       default:
         rendered.push(
           <JsonBlock
