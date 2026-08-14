@@ -8,7 +8,10 @@
  * the displaced members are always reachable by expanding the header.
  */
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  IconApiOutline14, IconBrowseOutline16, IconChevronDownOutline14, IconCodeOutline16,
+  IconEditOutline16, IconSearchOutline16, IconSparkle16,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import { draftingEntry } from './DraftingToolRow.tsx'
 import { DraftingToolRow } from './DraftingToolRow.tsx'
 import css from './ExecutionSlot.module.css'
@@ -33,38 +36,54 @@ export interface SlotDrafting {
 type HeaderForm =
   | { kind: 'drafting'; drafting: SlotDrafting }
   | { kind: 'running'; member: SlotMember }
-  | { kind: 'aggregate'; count: number; durationMs: number | null; names: string }
+  | { kind: 'aggregate' }
   | { kind: 'single' }
   | { kind: 'empty' }
 
-/** Format a settled run's total duration. */
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
-  const minutes = Math.floor(ms / 60_000)
-  const seconds = Math.round((ms % 60_000) / 1000)
-  return `${minutes}m${seconds.toString().padStart(2, '0')}s`
+/** Variant leading glyph for a wire tool name (mirrors GenericToolCard's table). */
+function toolIcon(name: string): ReactNode {
+  switch (name) {
+    case 'bash': case 'pwsh': return <IconApiOutline14 size={14} />
+    case 'read': case 'web_fetch': case 'read_image': case 'cordis_package_inspect':
+    case 'cordis_runtime_inspect': return <IconBrowseOutline16 size={14} />
+    case 'web_search': case 'grep': case 'glob': case 'session_search': case 'session_event_search':
+      return <IconSearchOutline16 size={14} />
+    case 'write': case 'edit': return <IconEditOutline16 size={14} />
+    case 'run_code': return <IconCodeOutline16 size={14} />
+    default: return <IconSparkle16 size={14} />
+  }
 }
 
-/** Compact tool-name summary for the aggregate header: `Edit×2 Read Bash`. */
-function nameSummary(names: readonly string[]): string {
-  const counts = new Map<string, number>()
-  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1)
-  const pretty = (name: string): string => {
-    switch (name) {
-      case 'pwsh': return 'Pwsh'
-      case 'bash': return 'Bash'
-      case 'run_code': return 'Code'
-      case 'todo_write': return 'Todo'
-      default: return name.charAt(0).toUpperCase() + name.slice(1)
+/** Per-tool action phrase for the aggregate header: `edit 1 file, read 1 file`. */
+function actionPhrase(name: string, count: number): string {
+  const noun = (base: string): string => count > 1 ? `${base}s` : base
+  switch (name) {
+    case 'edit': return `edit ${count} ${noun('file')}`
+    case 'write': return `create ${count} ${noun('file')}`
+    case 'read': case 'read_image': return `read ${count} ${noun('file')}`
+    case 'web_fetch': return `fetch ${count} ${noun('page')}`
+    case 'web_search': return `search ${count} ${noun('time')}`
+    case 'grep': return `search ${count} ${noun('pattern')}`
+    case 'glob': return `list ${count} ${noun('path')}`
+    case 'bash': case 'pwsh': return count > 1 ? `run ${count} commands` : 'run 1 command'
+    case 'run_code': return `run ${count} ${noun('program')}`
+    case 'todo_write': return `update ${count} ${noun('todo list')}`
+    default: {
+      const pretty = name.charAt(0).toUpperCase() + name.slice(1)
+      return count > 1 ? `${pretty} ×${count}` : pretty
     }
   }
-  return [...counts.entries()].map(([name, n]) => n > 1 ? `${pretty(name)}×${n}` : pretty(name)).join(' ')
 }
 
-/** Format like Claude Code: N 个操作 with Chinese copy matching the tab. */
-function countLabel(count: number): string {
-  return `${count} 个操作`
+/** Aggregate text: chronological per-tool phrases joined: `read 1 file, edit 1 file`. */
+function aggregateText(members: readonly SlotMember[]): string {
+  const order: string[] = []
+  const counts = new Map<string, number>()
+  for (const member of members) {
+    if (!counts.has(member.toolName)) order.push(member.toolName)
+    counts.set(member.toolName, (counts.get(member.toolName) ?? 0) + 1)
+  }
+  return order.map(name => actionPhrase(name, counts.get(name) ?? 1)).join(', ')
 }
 
 interface ExecutionSlotProps {
@@ -87,14 +106,14 @@ function headerForm(members: readonly SlotMember[], drafting: readonly SlotDraft
   const running = members.filter(m => m.running)
   const latestRunning = running[running.length - 1]
   if (latestRunning !== undefined) return { kind: 'running', member: latestRunning }
-  if (members.length >= 2) return { kind: 'aggregate', count: 0, durationMs: null, names: '' }
+  if (members.length >= 2) return { kind: 'aggregate' }
   if (members.length === 1) return { kind: 'single' }
   return { kind: 'empty' }
 }
 
 /** The single-slot execution view. */
 export const ExecutionSlot = memo(function ExecutionSlot({
-  members, drafting, durationMs, renderMember,
+  members, drafting, renderMember,
 }: ExecutionSlotProps) {
   const form = headerForm(members, drafting)
   const [expanded, setExpanded] = useState(false)
@@ -129,7 +148,9 @@ export const ExecutionSlot = memo(function ExecutionSlot({
   }
 
   if (form.kind === 'aggregate') {
-    const label = `${countLabel(members.length)}${durationMs === null ? '' : ` · ${formatDuration(durationMs)}`}`
+    // The aggregate shows only when no member is live (a live member owns the
+    // slot), so it always reads at the settled muted color.
+    const lastMember = members[members.length - 1]
     return (
       <div className={css.slot}>
         <div
@@ -140,11 +161,11 @@ export const ExecutionSlot = memo(function ExecutionSlot({
           onClick={() => { setExpanded(v => !v) }}
           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setExpanded(v => !v) }}
         >
-          <span className={css.chevron} aria-hidden>
-            <IconChevronDownOutline14 />
+          <span className={css.leading} aria-hidden>
+            <span className={css.leadingIcon}>{lastMember === undefined ? null : toolIcon(lastMember.toolName)}</span>
+            <span className={css.leadingChevron}><IconChevronDownOutline14 /></span>
           </span>
-          <span className={css.aggregateCount}>{label}</span>
-          <span className={css.aggregateNames}>{nameSummary(members.map(m => m.toolName))}</span>
+          <span className={css.aggregateText}>{aggregateText(members)}</span>
         </div>
         {expanded && (
           <div className={css.body}>

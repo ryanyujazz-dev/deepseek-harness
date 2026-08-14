@@ -514,9 +514,6 @@ export function ChatView({
               key={`run:${entry.members[0]?.nodeKey ?? index}`}
               members={entry.members}
               drafting={flow.drafting}
-              durationMs={entry.stepStart !== null && entry.stepEnd !== null
-                ? Math.max(0, entry.stepEnd - entry.stepStart)
-                : null}
               renderMember={renderMember}
             />
           ))}

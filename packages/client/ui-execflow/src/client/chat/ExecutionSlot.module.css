@@ -11,30 +11,19 @@
   min-height: 24px;
 }
 
-/* Crossfade layering: both outgoing and incoming headers render stacked; the
-   active one fades to opacity 1 over 200ms while the old fades out. */
-.headerLayer {
-  transition: opacity 200ms ease;
-}
-
-.headerLayerInactive {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* Expanded body: earlier members under the header, with the subCalls-style
-   left rail so depth reads the same as nested calls. */
+/* Expanded body: earlier members under the header, plain stack — no rail
+   (the rows carry their own affordances). */
 .body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 2px 0 2px 0;
-  padding-left: 8px;
-  border-left: 1px solid var(--dsw-alias-border-l2);
+  margin: 2px 0;
 }
 
-/* Aggregate header row: 24px, settles to the muted reading; while any member
-   is live the aggregate is not shown at all (a live member owns the slot). */
+/* Aggregate header row: 24px. While any member still runs the aggregate is
+   not shown (a live member owns the slot), so the aggregate itself reads at
+   the settled muted color by default; the live variant (kept for a run whose
+   members are still settling) keeps content color. */
 .aggregate {
   display: flex;
   align-items: center;
@@ -42,31 +31,63 @@
   height: 24px;
   font-size: 14px;
   line-height: 24px;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
   user-select: none;
 }
 
 .aggregate:hover {
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Live aggregate (a member settled but siblings still running): reads as
+   live text like a running row. */
+.aggregateLive {
   color: var(--dsw-alias-label-primary);
 }
 
-.aggregateCount {
-  color: var(--dsw-alias-label-primary);
-  font-weight: 500;
-}
-
-.aggregateDuration {
-  font-size: 12px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.aggregateNames {
-  font-size: 12px;
-  color: var(--dsw-alias-label-tertiary);
+.aggregateText {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.aggregateTextLive {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Leading seat: the LAST member's tool icon by default; hover swaps it for
+   the expand chevron (the disclosure affordance appears on intent). */
+.leading {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
+.leadingIcon,
+.leadingChevron {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 120ms ease;
+}
+
+.leadingChevron {
+  opacity: 0;
+}
+
+.aggregate:hover .leadingIcon {
+  opacity: 0;
+}
+
+.aggregate:hover .leadingChevron {
+  opacity: 1;
 }
 
 .chevron {
