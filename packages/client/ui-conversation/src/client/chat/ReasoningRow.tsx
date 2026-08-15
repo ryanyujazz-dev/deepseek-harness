@@ -76,16 +76,18 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
           </>
         )}
       >
-        <div className={css.thinkBody} ref={bodyRef} data-clamped={!full || undefined}>{text}</div>
-        {overflowing && (
-          <button
-            type="button"
-            className={css.thinkMore}
-            onClick={() => { setFull(value => !value) }}
-          >
-            {full ? 'Show less' : 'Show more'}
-          </button>
-        )}
+        <div className={css.thinkBody}>
+          <div className={css.thinkScroll} ref={bodyRef} data-clamped={!full || undefined}>{text}</div>
+          {overflowing && (
+            <button
+              type="button"
+              className={css.thinkMore}
+              onClick={() => { setFull(value => !value) }}
+            >
+              {full ? 'Show less' : 'Show more'}
+            </button>
+          )}
+        </div>
       </ExecDisclosureRow>
     </div>
   )
