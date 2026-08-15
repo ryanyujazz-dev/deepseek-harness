@@ -148,8 +148,23 @@
 
 /* Expanded body + Inspect pill wrapper (sibling of .row: clicks never toggle). */
 .bodyWrap {
+  position: relative;
   display: flex;
   flex-direction: column;
+}
+
+/* ExecFlow: the expanded block carries the think-style rail on the icon
+   centerline (x=8; 7.5 + 1/2). The wrapper spans from the row's left edge,
+   so one pseudo covers every card kind plus the Inspect pill. */
+.bodyWrap::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 7.5px;
+  width: 1px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
 }
 
 /* Hover-revealed jump to the trajectory record: a small pill in real flow

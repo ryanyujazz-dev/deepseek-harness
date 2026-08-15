@@ -237,3 +237,23 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ExecFlow: think-style rail on the icon centerline for the expanded
+   terminal / IO cards (they sit at margin-left 22px, so the rail anchors
+   back at -14.5px = x8 absolute). */
+.terminal,
+.ioCard {
+  position: relative;
+}
+
+.terminal::before,
+.ioCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -14.5px;
+  width: 1px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
+}
