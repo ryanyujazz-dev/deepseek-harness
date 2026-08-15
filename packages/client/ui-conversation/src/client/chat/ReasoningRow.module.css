@@ -100,7 +100,7 @@
 /* Inner scroll surface: the 15-line window (24px line-height + vertical
    padding) with internal scroll; `full` removes the clamp entirely. */
 .thinkScroll {
-  padding: 4px 0 4px 22px;
+  padding: 4px 0 0 22px;
   color: var(--dsw-alias-label-tertiary);
   font-size: 14px;
   line-height: 24px;
@@ -108,8 +108,12 @@
   word-break: break-word;
 }
 
-.thinkScroll[data-clamped] {
-  max-height: calc(24px * 15 + 8px);
+.thinkScroll:last-child {
+  margin-bottom: 4px;
+}
+
+.thinkBody[data-clamped] .thinkScroll {
+  max-height: calc(24px * 15 + 4px);
   overflow-y: auto;
 }
 
@@ -129,4 +133,27 @@
 
 .thinkMore:hover {
   color: var(--dsw-alias-label-primary);
+}
+
+/* Truncation masks: the conversation background fading in over the window's
+   top and bottom edges (12px), signaling clipped content. Overlays render
+   after the text (painted above it) and never intercept pointers. The bottom
+   band stops above the Show more line (24px line + 4px margin). */
+.maskTop,
+.maskBottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 12px;
+  pointer-events: none;
+}
+
+.maskTop {
+  top: 0;
+  background: linear-gradient(to bottom, var(--dsw-alias-bg-base), transparent);
+}
+
+.maskBottom {
+  bottom: calc(24px + 4px);
+  background: linear-gradient(to top, var(--dsw-alias-bg-base), transparent);
 }

@@ -76,8 +76,14 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
           </>
         )}
       >
-        <div className={css.thinkBody}>
-          <div className={css.thinkScroll} ref={bodyRef} data-clamped={!full || undefined}>{text}</div>
+        <div className={css.thinkBody} data-clamped={!full || undefined}>
+          <div className={css.thinkScroll} ref={bodyRef}>{text}</div>
+          {!full && overflowing && (
+            <>
+              <div className={css.maskTop} aria-hidden />
+              <div className={css.maskBottom} aria-hidden />
+            </>
+          )}
           {overflowing && (
             <button
               type="button"
