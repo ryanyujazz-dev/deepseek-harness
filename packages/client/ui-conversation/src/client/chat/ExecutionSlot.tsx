@@ -9,7 +9,7 @@
  */
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  IconApiOutline14, IconBrowseOutline16, IconChevronDownOutline14, IconCodeOutline16,
+  IconApiOutline14, IconBrowseOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconCodeOutline16,
   IconEditOutline16, IconSearchOutline16, IconSparkle16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { draftingEntry } from './DraftingToolRow.tsx'
@@ -161,16 +161,21 @@ export const ExecutionSlot = memo(function ExecutionSlot({
         >
           <span className={css.leading} aria-hidden>
             <span className={css.leadingIcon}>{lastMember === undefined ? null : toolIcon(lastMember.toolName)}</span>
-            <span className={css.leadingChevron}><IconChevronDownOutline14 /></span>
+            <span className={css.leadingChevron}>
+              {expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
+            </span>
           </span>
           <span className={css.aggregateText}>{aggregateText(members)}</span>
         </div>
         {expanded && (
-          <div className={css.body}>
-            {members.map(m => (
-              <div key={m.nodeKey}>{renderMember(m.nodeKey)}</div>
-            ))}
-          </div>
+          <>
+            <div className={css.railHead} aria-hidden />
+            <div className={css.body}>
+              {members.map(m => (
+                <div key={m.nodeKey} className={css.member}>{renderMember(m.nodeKey)}</div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     )

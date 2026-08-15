@@ -3,6 +3,7 @@
    body) at a fixed 24px row height so the flow never shifts. */
 
 .slot {
+  position: relative;
   min-width: 0;
 }
 
@@ -96,7 +97,40 @@
   opacity: 1;
 }
 
+.aggregate[aria-expanded='true'] .leadingIcon {
+  opacity: 0;
+}
+
+.aggregate[aria-expanded='true'] .leadingChevron {
+  opacity: 1;
+}
+
 .chevron {
   color: var(--dsw-alias-label-secondary);
   flex: none;
+}
+
+.railHead {
+  position: absolute;
+  top: 12px;
+  left: 7.5px;
+  width: 1px;
+  height: 12px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
+}
+
+.member {
+  position: relative;
+}
+
+.member::before {
+  content: '';
+  position: absolute;
+  top: -16px;
+  left: 7.5px;
+  width: 1px;
+  height: 28px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
 }
