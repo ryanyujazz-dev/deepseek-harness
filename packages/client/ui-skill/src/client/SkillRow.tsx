@@ -4,7 +4,7 @@
 
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  IconChevronDownOutline14, IconInspectOutline12, IconSkillOutline16, StateDot,
+  IconChevronDownOutline14, IconChevronRightOutline14, IconInspectOutline12, IconSkillOutline16, StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -86,15 +86,18 @@ function leadingFor(state: SkillRowState): ReactNode {
   }
 }
 
-/** Leading disclosure slot: state icon at rest, chevron on hover or while open. */
+/** Leading disclosure slot (ExecFlow form): the state icon stays in EVERY
+ *  state; the chevron is hover-only and directional — right while collapsed
+ *  (opens), down while expanded (closes). Mirrors the unified ToolRow chrome. */
 function disclosureLeading(state: SkillRowState, open: boolean, expandable: boolean): ReactNode {
-  if (open) return <IconChevronDownOutline14 className={css.chevron} />
-  const icon = leadingFor(state)
-  if (!expandable) return icon
+  if (!expandable) return leadingFor(state)
+  const hoverChevron = open
+    ? <IconChevronDownOutline14 className={`${css.chevron} ${css.chevronHover}`} />
+    : <IconChevronRightOutline14 className={`${css.chevron} ${css.chevronHover}`} />
   return (
     <>
-      <span className={css.iconIdle}>{icon}</span>
-      <IconChevronDownOutline14 className={`${css.chevron} ${css.chevronHover}`} />
+      <span className={css.iconIdle}>{leadingFor(state)}</span>
+      {hoverChevron}
     </>
   )
 }
@@ -152,18 +155,27 @@ export function SkillRow({ block, inspect, t }: SkillRowProps) {
           {summary}
         </span>
       </div>
+      {inspect !== undefined ? (
+        /* Hover-revealed Inspect at the title row's far right (absolute, so it
+           costs no line of layout; sibling of .row because the row's
+           overflow:hidden sweep clip would cut the above-row overlay). */
+        <Tooltip label={t('row.inspect')} side="bottom">
+          <button
+            type="button"
+            className={css.inspectButton}
+            aria-label={t('row.inspect')}
+            onClick={inspect}
+          >
+            <IconInspectOutline12 />
+          </button>
+        </Tooltip>
+      ) : null}
       {open ? (
         <div className={css.bodyWrap}>
           <section className={css.instructionsCard} aria-label={t('row.instructions')}>
             <div className={css.instructionsHeader}>{t('row.instructions')}</div>
             <pre className={css.instructions} data-error={model.state === 'error' || undefined}>{model.output}</pre>
           </section>
-          {inspect !== undefined ? (
-            <button type="button" className={css.inspectButton} onClick={inspect}>
-              <IconInspectOutline12 />
-              Inspect
-            </button>
-          ) : null}
         </div>
       ) : null}
     </div>

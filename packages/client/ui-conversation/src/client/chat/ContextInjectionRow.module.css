@@ -1,11 +1,28 @@
 /* Figma 10:2482: 24px Tool calls header, 4px gap, 141px code block cap. */
 
 .root {
+  position: relative; /* expanded-body rail anchor */
   min-width: 0;
 }
 
 .root[data-open] {
   padding-bottom: 4px;
+}
+
+/* ExecFlow: the expanded body carries the think-style rail on the icon
+   centerline (x=8; 7.5 + 1/2), exactly like ToolRow's expanded block — the
+   body is already title-left-aligned at 22px. The rail spans the body's
+   column (28px = the 24px header row plus the body's 4px top gap) and stops
+   at the row's open padding. */
+.root[data-open]::before {
+  content: '';
+  position: absolute;
+  top: 28px;
+  bottom: 4px;
+  left: 7.5px;
+  width: 1px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
 }
 
 .chevron {

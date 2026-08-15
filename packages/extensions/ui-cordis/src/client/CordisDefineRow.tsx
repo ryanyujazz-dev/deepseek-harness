@@ -1,8 +1,9 @@
 /** Read-only `cordis_define` card with Host and Client source tabs. */
 
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  CodeBlock, DisclosureRow, IconCodeOutline16, IconInspectOutline12, StateDot,
+  CodeBlock, IconChevronDownOutline14, IconChevronRightOutline14, IconCodeOutline16, IconInspectOutline12,
+  StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -72,6 +73,27 @@ export function CordisDefineRow({
       ? 'host'
       : card.clientCode !== null ? 'client' : 'host'
   const activeCode = activeSource === 'client' ? card.clientCode : card.hostCode
+  const toggleExpand = (): void => { setExpanded(value => !value) }
+  const toggleFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (!expandable || (event.key !== 'Enter' && event.key !== ' ')) return
+    event.preventDefault()
+    toggleExpand()
+  }
+  // ExecFlow leading: the state icon stays in EVERY state; the chevron is
+  // hover-only and directional — right while collapsed, down while expanded.
+  const leading = (() => {
+    const icon = leadingFor(card.state)
+    if (!expandable) return icon
+    const hoverChevron = open
+      ? <IconChevronDownOutline14 className={`${css.chevron} ${css.chevronHover}`} />
+      : <IconChevronRightOutline14 className={`${css.chevron} ${css.chevronHover}`} />
+    return (
+      <>
+        <span className={css.iconIdle}>{icon}</span>
+        {hoverChevron}
+      </>
+    )
+  })()
 
   return (
     <div
@@ -84,34 +106,46 @@ export function CordisDefineRow({
       data-cordis-status={reading}
     >
       {a11yState !== null && <span className={css.visuallyHidden}>{t(a11yState)}</span>}
-      <DisclosureRow
-        rowClassName={css.row}
-        titleClassName={css.title}
-        chevronClassName={css.chevron}
-        icon={leadingFor(card.state)}
-        title={t('row.defineTitle')}
-        open={open}
-        expandable={expandable}
-        expandOnRowClick
-        keepContentWhenOpen
-        onToggle={() => { setExpanded(value => !value) }}
-        collapsedContent={(
-          <>
-            <span className={css.separator} aria-hidden />
-            <span className={card.errorSummary === null ? css.name : css.errorSummary}>
-              {card.errorSummary ?? name}
-            </span>
-            {card.errorSummary === null && (
-              <span className={css.purpose}>{card.purpose ?? t('purpose.missing')}</span>
-            )}
-            {card.pluginId !== null && (
-              <span className={css.readout}>
-                <span className={css.statusLabel}>{t(READING_LABELS[reading])}</span>
-              </span>
-            )}
-          </>
-        )}
+      <div
+        className={css.row}
+        data-expandable={expandable || undefined}
+        role={expandable ? 'button' : undefined}
+        tabIndex={expandable ? 0 : undefined}
+        aria-expanded={expandable ? open : undefined}
+        onClick={expandable ? toggleExpand : undefined}
+        onKeyDown={expandable ? toggleFromKeyboard : undefined}
       >
+        <span className={css.leading}>{leading}</span>
+        <span className={css.title}>{t('row.defineTitle')}</span>
+        <span className={css.separator} aria-hidden />
+        <span className={card.errorSummary === null ? css.name : css.errorSummary}>
+          {card.errorSummary ?? name}
+        </span>
+        {card.errorSummary === null && (
+          <span className={css.purpose}>{card.purpose ?? t('purpose.missing')}</span>
+        )}
+        {card.pluginId !== null && (
+          <span className={css.readout}>
+            <span className={css.statusLabel}>{t(READING_LABELS[reading])}</span>
+          </span>
+        )}
+      </div>
+      {inspect !== undefined && (
+        /* Hover-revealed Inspect at the title row's far right (absolute, so it
+           costs no line of layout; sibling of .row because the row's
+           overflow:hidden sweep clip would cut the above-row overlay). */
+        <Tooltip label={t('inspect')} side="bottom">
+          <button
+            type="button"
+            className={css.inspectButton}
+            aria-label={t('inspect')}
+            onClick={inspect}
+          >
+            <IconInspectOutline12 />
+          </button>
+        </Tooltip>
+      )}
+      {open && (
         <div className={css.bodyWrap}>
           {hasSource && activeCode !== null && (
             <section className={css.sourceCard}>
@@ -158,14 +192,8 @@ export function CordisDefineRow({
             </section>
           )}
           {card.pluginId !== null && <div className={css.panelHint}>{t('panel.hint')}</div>}
-          {inspect !== undefined && (
-            <button type="button" className={css.inspectButton} onClick={inspect}>
-              <IconInspectOutline12 />
-              Inspect
-            </button>
-          )}
         </div>
-      </DisclosureRow>
+      )}
     </div>
   )
 }

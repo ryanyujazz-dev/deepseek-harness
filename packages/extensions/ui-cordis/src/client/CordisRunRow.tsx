@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import {
-  IconCodeOutline16, IconInspectOutline12, StateDot,
+  IconCodeOutline16, IconInspectOutline12, StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -105,9 +105,11 @@ export function CordisRunRow({
         <span className={card.errorSummary === null ? css.summary : css.error}>{summary}</span>
         <span className={css.status}>{status}</span>
         {inspect !== undefined && (
-          <button type="button" className={css.inspect} aria-label="Inspect" onClick={inspect}>
-            <IconInspectOutline12 />
-          </button>
+          <Tooltip label={t('inspect')} side="bottom">
+            <button type="button" className={css.inspect} aria-label={t('inspect')} onClick={inspect}>
+              <IconInspectOutline12 />
+            </button>
+          </Tooltip>
         )}
       </div>
       {reading === 'removed' && <div className={css.message}>{t('run.removed')}</div>}
