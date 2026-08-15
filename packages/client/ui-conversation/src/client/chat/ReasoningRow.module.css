@@ -76,9 +76,12 @@
   position: relative;
 }
 
-/* 1px rail centered on x=8 (hairline weight; placed at 7.5 = 8 - 0.5). */
-.thinkBody::before {
-  content: '';
+/* 1px rail centered on x=8 (hairline weight; placed at 7.5 = 8 - 0.5).
+   A REAL overlay node (not a pseudo): a sibling of the scroll surface inside
+   the non-scrolling wrapper, pinned to the wrapper's box — scrolling the
+   text, streaming growth inside the window, and the edge masks can never
+   move or resize it. Painted beneath the text, never hit-testable. */
+.rail {
   position: absolute;
   top: 4px;
   bottom: 4px;

@@ -90,6 +90,7 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
         )}
       >
         <div className={css.thinkBody} data-clamped={!full || undefined}>
+          <div className={css.rail} aria-hidden />
           <div className={css.thinkScroll} ref={bodyRef} onScroll={probeWindow}>{text}</div>
           {!full && overflowing && canScrollUp && <div className={css.maskTop} aria-hidden />}
           {!full && overflowing && canScrollDown && <div className={css.maskBottom} aria-hidden />}
