@@ -6,7 +6,7 @@
 // ObservableSnapshot fake as chat-view.client.spec.tsx.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, render, waitFor } from '@testing-library/react'
 import type {
   ConversationSnapshot, RunningToolCall, SessionId, SessionListState,
   ToolResultNode, WorkspaceListState,
@@ -268,6 +268,75 @@ describe('ExecFlow partition and slot forms', () => {
     })
     const r2 = render(<h2.ChatView {...h2.props} />)
     expect(r2.container.textContent).not.toContain('Reading')
+  })
+
+  it('a later parallel tool finishing returns the header to the still-running earlier one', async () => {
+    // A running (turn 2), B lands running (B heads), B settles (A heads again).
+    const h = makeHarness({
+      nodes: [user(1, 'go')],
+      runningCalls: [runningCall('a', 'read'), runningCall('b', 'edit')],
+      running: true,
+    })
+    const { container } = render(<h.ChatView {...h.props} />)
+    expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
+
+    // B settles; A still runs — the header must NOT become an aggregate.
+    act(() => {
+      h.set({
+        nodes: [user(1, 'go'), { ...toolResult(2, 'b', 'edit', 2), turn: 2 } as never],
+        runningCalls: [runningCall('a', 'read')],
+        running: true,
+      })
+    })
+    expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
+    expect(container.textContent).toContain('未知 surface 事件：tool-call')
+
+    // A settles too — now the aggregate forms (through the coalesce queue:
+    // the header was mid-slide running(b)→running(a), so the aggregate
+    // airs after that slide completes).
+    act(() => {
+      h.set({
+        nodes: [
+          user(1, 'go'),
+          { ...toolResult(2, 'b', 'edit', 2), turn: 2 } as never,
+          { ...toolResult(3, 'a', 'read', 2), turn: 2 } as never,
+        ],
+        runningCalls: [],
+        running: false,
+        // The turn closes when its last tool settles (production logs
+        // turn/end); the turn-tail node it appends also gives the fixture
+        // a fresh order identity, which the phased source needs to
+        // re-render (the store's key sequence alone is unchanged here).
+        turnEnds: new Map([[2, 4]]),
+      })
+    })
+    await waitFor(() => {
+      const agg = container.querySelector('[class*="aggregate"][role="button"]')
+      expect(agg).not.toBeNull()
+      expect(agg?.textContent).toContain('编辑')
+    })
+  })
+
+  it('unmapped tools read the generic Use N tools phrase in the aggregate', () => {
+    const h = makeHarness({
+      nodes: [
+        user(1, 'go'),
+        { ...toolResult(2, 'j1', 'job_output', 1), turn: 1 } as never,
+        { ...toolResult(3, 'j2', 'job_output', 1), turn: 1 } as never,
+        assistant(4, 'done', 1),
+      ],
+    })
+    const { container } = render(<h.ChatView {...h.props} />)
+    const agg = container.querySelector('[class*="aggregate"][role="button"]')
+    expect(agg?.textContent).toContain('执行 2 个工具')
+  })
+
+  it('registers the aggregate fallback dictionary keys in both locales', async () => {
+    const mod = await import('../src/client/locales.ts')
+    expect(mod.zh['execflow.agg.tools']).toBe('执行 {count} 个工具')
+    expect(mod.zh['execflow.agg.tools.one']).toBe('执行 1 个工具')
+    expect(mod.en['execflow.agg.tools']).toBe('Use {count} tools')
+    expect(mod.en['execflow.agg.tools.one']).toBe('Use 1 tool')
   })
 
   it('a running call heads the slot while the settled sibling waits in the body', () => {

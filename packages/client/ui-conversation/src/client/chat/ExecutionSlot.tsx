@@ -68,10 +68,10 @@ function actionPhrase(name: string, count: number, t: Translate): string {
     case 'bash': case 'pwsh': return pair('execflow.agg.run.one', 'execflow.agg.run')
     case 'run_code': return pair('execflow.agg.program.one', 'execflow.agg.program')
     case 'todo_write': return pair('execflow.agg.todo.one', 'execflow.agg.todo')
-    default: {
-      const pretty = name.charAt(0).toUpperCase() + name.slice(1)
-      return count > 1 ? `${pretty} ×${count}` : pretty
-    }
+    default:
+      // Unmapped tools (job_output, subagent, workflow, …) degrade to the
+      // generic tool phrase; the sparkle leading icon stays.
+      return pair('execflow.agg.tools.one', 'execflow.agg.tools')
   }
 }
 
@@ -119,19 +119,23 @@ export const ExecutionSlot = memo(function ExecutionSlot({
   const { shown, outgoing, gen } = useHeaderTransition(form)
   const [expanded, setExpanded] = useState(false)
 
-  // Members other than a running header are the expand body; the aggregate's
-  // body is every member. A drafting header's body is earlier drafting blocks
-  // plus landed members (chronological by position: drafting are newest, so
-  // landed first, then earlier drafting blocks — the header is the latest).
+  // The aggregate body is EVERY member in every multi-member form: a running
+  // or drafting header only reports the live member, so the body carries all
+  // of them (chronological — the live tool naturally reads last, which is the
+  // design). Earlier drafting blocks join the drafting header's body.
   const bodyKeys: string[] = useMemo(() => {
-    if (form.kind === 'aggregate') return members.map(m => m.nodeKey)
-    if (form.kind === 'running') return members.filter(m => m !== form.member).map(m => m.nodeKey)
-    return []
+    if (form.kind === 'single' || form.kind === 'empty') return []
+    return members.map(m => m.nodeKey)
   }, [form, members])
   const earlierDrafting: SlotDrafting[] = form.kind === 'drafting'
     ? drafting.filter(d => d !== form.drafting && draftingEntry(d.name) !== undefined)
     : []
-  const expandable = bodyKeys.length > 0 || earlierDrafting.length > 0 || form.kind === 'aggregate'
+  // Expandable once aggregated content exists: ≥2 members for the settled and
+  // live forms; a drafting header ALSO opens when earlier drafting blocks
+  // exist with no landed member yet.
+  const expandable = form.kind === 'aggregate'
+    || (form.kind === 'running' && members.length >= 2)
+    || (form.kind === 'drafting' && (members.length >= 1 || earlierDrafting.length > 0))
 
   // Keep expansion through header swaps (new member replaces the header, the
   // displaced one joins the body); only an empty slot resets.
@@ -141,64 +145,74 @@ export const ExecutionSlot = memo(function ExecutionSlot({
 
   if (form.kind === 'empty') return null
 
-  /** One form's header chrome (the stage layers render this for shown/outgoing). */
+  /** One form's header chrome (the stage layers render this for shown/outgoing).
+   *  ONE structural wrapper for every form — the member row's position in the
+   *  React tree is identical across single/running transitions (stable mount;
+   *  the chat-view retention spec is the regression sentinel).
+   *
+   *  Toggle semantics (aggregated slots): once expandable, the WHOLE header is
+   *  the aggregate disclosure — clicks never reach the member row's own
+   *  interactions. The interceptor runs in the CAPTURE phase and stops
+   *  propagation: the click toggles the body and dies before the row's
+   *  expandOnRowClick fires (React's onClick would be too late — the row's
+   *  handler runs first on the target). The single form passes the row
+   *  through untouched (native interactions, no toggle). */
   const renderHeaderContent = (f: HeaderForm): ReactNode => {
-    // The aggregate shows only when no member is live (a live member owns
-    // the slot), so it always reads at the settled muted color.
-    if (f.kind === 'aggregate') {
-      const lastMember = members[members.length - 1]
-      return (
-        <div
-          className={css.aggregate}
-          role="button"
-          tabIndex={0}
-          aria-expanded={expanded}
-          onClick={() => { setExpanded(v => !v) }}
-          onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setExpanded(v => !v) }}
-        >
-          <span className={css.leading} aria-hidden>
-            <span className={css.leadingIcon}>{lastMember === undefined ? null : toolIcon(lastMember.toolName)}</span>
-            <span className={css.leadingChevron}>
-              {expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
-            </span>
-          </span>
-          <span className={css.aggregateText}>{aggregateText(members, t)}</span>
-        </div>
-      )
-    }
-    // Single settled member: its own ordinary row, native interactions
-    // through the SAME header wrapper the live forms use, so the row's
-    // position in the React tree stays stable across the running to settled
-    // transition (an instant-swap class) and never remounts.
-    if (f.kind === 'single') {
-      const singleMember = members[0]
-      return <div className={css.header}>{singleMember === undefined ? null : renderMember(singleMember.nodeKey)}</div>
-    }
-    // Live header (drafting or running). The member's own row renders as the
-    // header content and KEEPS its native interactions (click expands the
-    // row's own disclosure); the slot's expand rides a separate handle, so
-    // one click can never toggle both and no control nests another.
+    const intercept = expandable && f.kind !== 'aggregate' && f.kind !== 'single'
     const entry = f.kind === 'drafting' ? draftingEntry(f.drafting.name) : undefined
+    const ariaLabel = f.kind === 'running'
+      ? t('execflow.slot.toggle', { name: f.member.toolName })
+      : t('execflow.slot.toggleDrafting', { label: entry === undefined ? '' : t(entry.key) })
     return (
-      <div className={css.header}>
-        {expandable && (
-          <button
-            type="button"
-            className={css.handle}
+      <div
+        className={css.header}
+        {...intercept ? {
+          role: 'button',
+          tabIndex: 0,
+          'aria-expanded': expanded,
+          'aria-label': ariaLabel,
+        } : {}}
+        {...intercept ? {
+          onClickCapture: (event: React.MouseEvent) => {
+            event.stopPropagation()
+            event.preventDefault()
+            setExpanded(v => !v)
+          },
+          onKeyDown: (event: React.KeyboardEvent) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.stopPropagation()
+              event.preventDefault()
+              setExpanded(v => !v)
+            }
+          },
+        } : {}}
+      >
+        {f.kind === 'aggregate' ? (
+          <div
+            className={css.aggregate}
+            role="button"
+            tabIndex={0}
             aria-expanded={expanded}
-            aria-label={f.kind === 'running'
-              ? t('execflow.slot.toggle', { name: f.member.toolName })
-              : t('execflow.slot.toggleDrafting', { label: entry === undefined ? '' : t(entry.key) })}
             onClick={() => { setExpanded(v => !v) }}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setExpanded(v => !v) }}
           >
-            {expanded
-              ? <IconChevronDownOutline14 />
-              : <IconChevronRightOutline14 />}
-          </button>
-        )}
-        {f.kind === 'drafting' && entry !== undefined
-          ? <DraftingToolRow label={t(entry.key)} icon={entry.icon} />
-          : f.kind === 'running' ? renderMember(f.member.nodeKey) : null}
+            <span className={css.leading} aria-hidden>
+              <span className={css.leadingIcon}>
+                {(() => { const last = members[members.length - 1]; return last === undefined ? null : toolIcon(last.toolName) })()}
+              </span>
+              <span className={css.leadingChevron}>
+                {expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
+              </span>
+            </span>
+            <span className={css.aggregateText}>{aggregateText(members, t)}</span>
+          </div>
+        ) : f.kind === 'drafting' && entry !== undefined ? (
+          <DraftingToolRow label={t(entry.key)} icon={entry.icon} />
+        ) : f.kind === 'running' ? (
+          renderMember(f.member.nodeKey)
+        ) : f.kind === 'single' && members[0] !== undefined ? (
+          renderMember(members[0].nodeKey)
+        ) : null}
       </div>
     )
   }

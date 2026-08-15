@@ -210,7 +210,9 @@ export const zh = {
   'execflow.agg.program': '运行 {count} 段程序',
   'execflow.agg.program.one': '运行 1 段程序',
   'execflow.agg.todo': '更新 {count} 个待办列表',
+  'execflow.agg.tools': '执行 {count} 个工具',
   'execflow.agg.todo.one': '更新 1 个待办列表',
+  'execflow.agg.tools.one': '执行 1 个工具',
 } satisfies Record<string, string>
 
 /** The conversation namespace key union. */
@@ -418,5 +420,7 @@ export const en = {
   'execflow.agg.program': 'Run {count} programs',
   'execflow.agg.program.one': 'Run 1 program',
   'execflow.agg.todo': 'Update {count} todo lists',
+  'execflow.agg.tools': 'Use {count} tools',
   'execflow.agg.todo.one': 'Update 1 todo list',
+  'execflow.agg.tools.one': 'Use 1 tool',
 } satisfies Record<ConversationKey, string>
