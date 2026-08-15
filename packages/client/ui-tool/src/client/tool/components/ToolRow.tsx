@@ -294,10 +294,11 @@ export function ToolRow({
             <button
               type="button"
               className={css.inspectButton}
+              title="Inspect"
+              aria-label="Inspect"
               onClick={inspect}
             >
               <IconInspectOutline12 />
-              Inspect
             </button>
           )}
         </div>

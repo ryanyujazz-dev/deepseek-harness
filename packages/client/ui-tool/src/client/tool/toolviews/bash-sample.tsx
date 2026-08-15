@@ -155,9 +155,14 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
               </div>
             )}
           {inspect !== undefined && (
-            <button type="button" className={css.inspectButton} onClick={inspect}>
+            <button
+              type="button"
+              className={css.inspectButton}
+              title="Inspect"
+              aria-label="Inspect"
+              onClick={inspect}
+            >
               <IconInspectOutline12 />
-              Inspect
             </button>
           )}
         </div>

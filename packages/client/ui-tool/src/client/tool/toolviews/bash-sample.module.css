@@ -197,34 +197,29 @@
   flex-direction: column;
 }
 
+/* Inspect affordance: an icon-only hover-revealed overlay at the expanded
+   block's top-right corner (title tooltip on hover); absolute so it costs
+   no line of layout. */
 .inspectButton {
+  position: absolute;
+  top: 4px;
+  right: 0;
   display: inline-flex;
-  align-self: flex-start;
   align-items: center;
-  gap: 4px;
-  margin: 4px 0 2px 22px;
-  padding: 2px 8px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 999px;
-  /* Base background, not bg-overlay: the overlay token reads too heavy. */
-  background: var(--dsw-alias-bg-base);
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-  line-height: 16px;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
   opacity: 0;
   transition: opacity 100ms ease;
+  z-index: 1;
 }
 
-.card:hover .inspectButton,
-.inspectButton:focus-visible {
-  opacity: 1;
-}
-
-/* Solid hover fill: the pill floats over terminal output, so a translucent
-   hover token would let the text underneath bleed through. */
 .inspectButton:hover {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
   color: var(--dsw-alias-label-primary);
 }
 
