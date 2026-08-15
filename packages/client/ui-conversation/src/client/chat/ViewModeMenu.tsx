@@ -19,6 +19,9 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconEllipsisOutline16, Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ThinkMode } from './ChatView.tsx'
+import type { ChatViewSlotProps } from '../contract/slots.ts'
+
+type Translate = ChatViewSlotProps['t']
 import css from './ViewModeMenu.module.css'
 
 interface ViewModeMenuProps {
@@ -26,6 +29,8 @@ interface ViewModeMenuProps {
   thinkMode: ThinkMode
   /** Switch the form (persisted by the owner). */
   onSetMode: (mode: ThinkMode) => void
+  /** The owning view's locale seat. */
+  t: Translate
 }
 
 /** Viewport coordinates of the scrollport's top-left. */
@@ -35,36 +40,45 @@ interface AnchorPosition {
 }
 
 /** The execflow display-mode picker. */
-export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
+export function ViewModeMenu({ thinkMode, onSetMode, t }: ViewModeMenuProps) {
   const [open, setOpen] = useState(false)
   const [anchor, setAnchor] = useState<AnchorPosition | null>(null)
 
   // Measure the scrollport's top-left in viewport coordinates. The layout
   // settles asynchronously (session open, sidebar animations), so measure on
   // mount, on window resize, and through a ResizeObserver on the scrollport
-  // itself — the observer catches every geometry change regardless of cause.
+  // itself. If the scrollport is not in the DOM yet (late session open), a
+  // short settle retry re-runs the whole setup once the anchor exists.
   useEffect(() => {
+    let observer: ResizeObserver | undefined
+    let retry: number | undefined
     const measure = (): void => {
       const scroller = document.querySelector('[data-conversation-scroll]')
       if (!(scroller instanceof HTMLElement)) {
         setAnchor(null)
+        // Insurance: re-attempt the wiring once the layout settles.
+        if (retry === undefined) {
+          retry = window.setTimeout(() => { retry = undefined; measure() }, 200)
+        }
         return
       }
+      window.clearTimeout(retry)
+      retry = undefined
       const rect = scroller.getBoundingClientRect()
       setAnchor(previous =>
         previous !== null && previous.left === rect.left && previous.top === rect.top
           ? previous
           : { left: rect.left, top: rect.top })
+      observer?.disconnect()
+      if (typeof ResizeObserver === 'function') {
+        observer = new ResizeObserver(measure)
+        observer.observe(scroller)
+      }
     }
-    measure()
     window.addEventListener('resize', measure)
-    let observer: ResizeObserver | undefined
-    const scroller = document.querySelector('[data-conversation-scroll]')
-    if (scroller instanceof HTMLElement && typeof ResizeObserver === 'function') {
-      observer = new ResizeObserver(measure)
-      observer.observe(scroller)
-    }
+    measure()
     return () => {
+      window.clearTimeout(retry)
       window.removeEventListener('resize', measure)
       observer?.disconnect()
     }
@@ -81,9 +95,9 @@ export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
   }, [open])
 
   const items: MenuEntry[] = [
-    { type: 'label', id: 'display', text: '显示方式' },
-    { id: 'compact', label: 'Normal' },
-    { id: 'inline', label: 'Think' },
+    { type: 'label', id: 'display', text: t('execflow.menu.display') },
+    { id: 'compact', label: t('execflow.menu.normal') },
+    { id: 'inline', label: t('execflow.menu.think') },
   ]
 
   if (anchor === null) return null
@@ -96,7 +110,7 @@ export function ViewModeMenu({ thinkMode, onSetMode }: ViewModeMenuProps) {
           <button
             type="button"
             className={css.trigger}
-            aria-label="执行流显示方式"
+            aria-label={t('execflow.menu.aria')}
             aria-haspopup="menu"
             aria-expanded={open}
             onClick={() => { setOpen(v => !v) }}

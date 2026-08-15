@@ -9,7 +9,33 @@
 
 .header {
   position: relative;
+  display: flex;
+  align-items: flex-start;
   min-height: 24px;
+}
+
+/* Slot expansion handle: a 16px seat at the header row's RIGHT edge — the
+   member row keeps its own leading seat and whole-row disclosure; the two
+   affordances never overlap and never nest. */
+.handle {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.handle:hover {
+  color: var(--dsw-alias-label-primary);
 }
 
 /* Expanded body: earlier members under the header, stacked at the official

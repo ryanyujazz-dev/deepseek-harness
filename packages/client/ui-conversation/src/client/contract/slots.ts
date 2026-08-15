@@ -240,6 +240,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
+/** Think display form: inline rows in the flow vs hidden (content-anchored runs). */
+export type ThinkMode = 'inline' | 'compact'
+
 /** Owner share of the hero agent-preset chip: the shell supplies nothing. */
 export interface HeroAgentPresetOwnerProps {
   /** Marker field: the chip owns its own roster, staging, and menu state. */

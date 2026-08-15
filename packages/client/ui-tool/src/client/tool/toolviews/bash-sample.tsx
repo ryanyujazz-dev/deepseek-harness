@@ -155,11 +155,11 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
               </div>
             )}
           {inspect !== undefined && (
-            <Tooltip label="Inspect" side="bottom">
+            <Tooltip label={t('execflow.inspect')} side="bottom">
               <button
                 type="button"
                 className={css.inspectButton}
-                aria-label="Inspect"
+                aria-label={t('execflow.inspect')}
                 onClick={inspect}
               >
                 <IconInspectOutline12 />

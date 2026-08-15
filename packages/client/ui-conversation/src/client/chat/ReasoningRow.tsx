@@ -101,7 +101,7 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
               className={css.thinkMore}
               onClick={() => { setFull(value => !value) }}
             >
-              {full ? 'Show less' : 'Show more'}
+              {full ? t('execflow.think.less') : t('execflow.think.more')}
             </button>
           )}
         </div>

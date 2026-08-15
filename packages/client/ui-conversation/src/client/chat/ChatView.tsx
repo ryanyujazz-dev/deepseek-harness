@@ -24,6 +24,7 @@ import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
+const EMPTY_DRAFTING: readonly SlotDrafting[] = []
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -147,10 +148,10 @@ function TurnStatus({ startTime, t, thinkMode, onToggleThinkMode, showThinkSwitc
           type="button"
           className={css.thinkToggle}
           aria-pressed={thinkMode === 'compact'}
-          title={thinkMode === 'compact' ? '显示 Thinking 内容' : '隐藏 Thinking 内容'}
+          title={thinkMode === 'compact' ? t('execflow.status.showThink') : t('execflow.status.hideThink')}
           onClick={onToggleThinkMode}
         >
-          Thinking
+          {t('execflow.status.thinking')}
         </button>
       )}
     </div>
@@ -159,7 +160,8 @@ function TurnStatus({ startTime, t, thinkMode, onToggleThinkMode, showThinkSwitc
 
 /** Think display form: inline ReasoningRows in the flow (A) vs hidden from the
  * flow entirely — content-anchored aggregation (B). Persisted per browser. */
-export type ThinkMode = 'inline' | 'compact'
+export type { ThinkMode } from '../contract/slots.ts'
+import type { ThinkMode } from '../contract/slots.ts'
 
 const THINK_MODE_KEY = 'dsh.execflow.think-mode'
 
@@ -202,7 +204,7 @@ export function ChatView({
     }
   }, [])
   const toggleThinkMode = useCallback(() => {
-    setThinkMode((previous) => {
+    setThinkMode((previous: ThinkMode) => {
       const next: ThinkMode = previous === 'inline' ? 'compact' : 'inline'
       try {
         window.localStorage.setItem(THINK_MODE_KEY, next)
@@ -219,6 +221,26 @@ export function ChatView({
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
 
+  const partial = useSession(s => s.partial)
+
+  // Drafting signature: names+count of the partial's tool-call blocks. The
+  // partition only cares about THIS shape — text deltas inside the partial
+  // change the object identity every token but never the signature, so the
+  // O(entries) rescan below runs only when a drafting block actually appears,
+  // renames, or lands.
+  const partialDrafting = useMemo(() => {
+    if (partial === null) return { list: EMPTY_DRAFTING, turn: null as number | null }
+    const list: SlotDrafting[] = []
+    partial.blocks.forEach((block, index) => {
+      if (block.kind === 'tool-call' && block.name !== '') {
+        list.push({ name: block.name, index })
+      }
+    })
+    return { list, turn: partial.turn }
+  }, [partial])
+  const draftingList = partialDrafting.list
+  const draftingTurn = partialDrafting.turn
+
   // ExecFlow single-slot partitioning: contiguous tool-call nodes form one
   // execution run rendered through ExecutionSlot (one morphing header,
   // expandable body). The anchor depends on the think form — inline: a node
@@ -226,7 +248,6 @@ export function ChatView({
   // included), so runs stay step-scoped; compact: think renders nothing, so
   // only content-bearing nodes (text/images, user bubbles, errors) split —
   // runs aggregate across steps between content anchors.
-  const partial = useSession(s => s.partial)
   const flow = useMemo(() => {
     type Entry =
       | { kind: 'node'; nodeKey: string }
@@ -309,22 +330,15 @@ export function ChatView({
     // attach them to the LAST run entry only (a run of the same turn), or —
     // before the first tool/call lands and the run entry exists — carry them
     // as a pending run so the slot can render the drafting header.
-    const drafting: SlotDrafting[] = []
-    if (partial !== null) {
-      partial.blocks.forEach((block, index) => {
-        if (block.kind === 'tool-call' && block.name !== '') {
-          drafting.push({ name: block.name, index })
-        }
-      })
-    }
+    const drafting = draftingList
     let draftingForLastRun = false
-    if (drafting.length > 0 && partial !== null) {
+    if (drafting.length > 0 && draftingTurn !== null) {
       const last = entries[entries.length - 1]
       const firstMember = last?.kind === 'run' ? last.members[0] : undefined
       if (firstMember !== undefined) {
         const lastLocation = nodeStore.get(firstMember.nodeKey)?.location
         draftingForLastRun = (lastLocation?.kind === 'step' || lastLocation?.kind === 'turn')
-          && lastLocation.turn.turn === partial.turn
+          && lastLocation.turn.turn === draftingTurn
       } else {
         // No run yet for the streaming step (the last entry is a plain node or
         // the flow is empty): create a pending (empty) run that renders the
@@ -333,8 +347,8 @@ export function ChatView({
         draftingForLastRun = true
       }
     }
-    return { entries, drafting: draftingForLastRun ? drafting : [] }
-  }, [order, nodeStore, partial, thinkMode])
+    return { entries, drafting: draftingForLastRun ? draftingList : [] }
+  }, [order, nodeStore, thinkMode, draftingList, draftingTurn])
 
   /** One member's full row through the node seat (running or settled styling). */
   const renderMember = useCallback((nodeKey: string) => (
@@ -552,8 +566,8 @@ export function ChatView({
 
   return (
     <div className={css.root}>
-      {/* Display-mode picker (Normal / Think), pinned at the view's top-right. */}
-      <ViewModeMenu thinkMode={thinkMode} onSetMode={writeThinkMode} />
+      {/* Display-mode picker (Normal / Think), floating at the conversation column's top-left. */}
+      <ViewModeMenu thinkMode={thinkMode} onSetMode={writeThinkMode} t={t} />
       <div ref={listRef} className={css.scroll}>
         <div ref={columnRef} className={css.column} data-chat-flow="">
           {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
@@ -587,7 +601,11 @@ export function ChatView({
             />
           ) : (
             <ExecutionSlot
-              key={`run:${entry.members[0]?.nodeKey ?? index}`}
+              /* Key stability: a landed run keys on its first member; the
+                 pending drafting run keys on the partial's turn — the run it
+                 BECOMES — so landing the first member keeps the identity (no
+                 remount, expansion survives). */
+              key={`run:${entry.members[0]?.nodeKey ?? `pending:${partial?.turn ?? 'tail'}`}`}
               members={entry.members}
               /* The partial's drafting blocks belong to ONE run — the LAST
                  entry (the partition either matched the partial's turn on
@@ -596,6 +614,7 @@ export function ChatView({
                  drafting row while a call was being composed. */
               drafting={index === flow.entries.length - 1 ? flow.drafting : []}
               renderMember={renderMember}
+              t={t}
             />
           ))}
           {/* No pending placeholders: questions (ui-user-questions) and approvals

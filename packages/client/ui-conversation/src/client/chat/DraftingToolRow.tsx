@@ -21,21 +21,24 @@ import type { ReactNode } from 'react'
 import {
   IconChecklistOutline14, IconCodeOutline16, IconEditOutline16, IconListPenOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ChatViewSlotProps } from '../contract/slots.ts'
 import css from './DraftingToolRow.module.css'
 
-/** One drafting mapping: capitalized label + the settled row's glyph. */
-interface DraftingEntry {
-  readonly label: string
+type ConversationKey = Parameters<ChatViewSlotProps['t']>[0]
+
+/** One drafting mapping: locale key + the settled row's glyph. */
+export interface DraftingEntry {
+  readonly key: ConversationKey
   readonly icon: ReactNode
 }
 
-/** Wire name → drafting presentation; absent name = no drafting row. */
+/** Wire name → drafting presentation (locale key + the settled glyph). */
 const DRAFTING: Record<string, DraftingEntry> = {
-  edit: { label: 'Editing', icon: <IconEditOutline16 size={14} /> },
-  write: { label: 'Creating', icon: <IconEditOutline16 size={14} /> },
-  exit_plan_mode: { label: 'Planning', icon: <IconListPenOutline16 size={14} /> },
-  run_code: { label: 'Coding', icon: <IconCodeOutline16 size={14} /> },
-  todo_write: { label: 'Updating todos', icon: <IconChecklistOutline14 /> },
+  edit: { key: 'execflow.draft.editing', icon: <IconEditOutline16 size={14} /> },
+  write: { key: 'execflow.draft.creating', icon: <IconEditOutline16 size={14} /> },
+  exit_plan_mode: { key: 'execflow.draft.planning', icon: <IconListPenOutline16 size={14} /> },
+  run_code: { key: 'execflow.draft.coding', icon: <IconCodeOutline16 size={14} /> },
+  todo_write: { key: 'execflow.draft.todos', icon: <IconChecklistOutline14 /> },
 }
 
 /**

@@ -12,6 +12,10 @@ import {
   IconApiOutline14, IconBrowseOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconCodeOutline16,
   IconEditOutline16, IconSearchOutline16, IconSparkle16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ChatViewSlotProps } from '../contract/slots.ts'
+
+type Translate = ChatViewSlotProps['t']
+type ConversationKey = Parameters<Translate>[0]
 import { draftingEntry } from './DraftingToolRow.tsx'
 import { DraftingToolRow } from './DraftingToolRow.tsx'
 import css from './ExecutionSlot.module.css'
@@ -55,19 +59,22 @@ function toolIcon(name: string): ReactNode {
 }
 
 /** Per-tool action phrase for the aggregate header: `Edit 1 file, Read 1 file`. */
-function actionPhrase(name: string, count: number): string {
-  const noun = (base: string): string => count > 1 ? `${base}s` : base
+/** One aggregate phrase: locale key + count params (the `.one` keys carry no
+ * params). Unknown tools fall back to the wire name itself (a name, not copy). */
+function actionPhrase(name: string, count: number, t: Translate): string {
+  const pair = (one: ConversationKey, many: ConversationKey): string =>
+    count === 1 ? t(one) : t(many, { count })
   switch (name) {
-    case 'edit': return `Edit ${count} ${noun('file')}`
-    case 'write': return `Create ${count} ${noun('file')}`
-    case 'read': case 'read_image': return `Read ${count} ${noun('file')}`
-    case 'web_fetch': return `Fetch ${count} ${noun('page')}`
-    case 'web_search': return `Search ${count} ${noun('time')}`
-    case 'grep': return `Search ${count} ${noun('pattern')}`
-    case 'glob': return `List ${count} ${noun('path')}`
-    case 'bash': case 'pwsh': return count > 1 ? `Run ${count} commands` : 'Run 1 command'
-    case 'run_code': return `Run ${count} ${noun('program')}`
-    case 'todo_write': return `Update ${count} ${noun('todo list')}`
+    case 'edit': return pair('execflow.agg.edit.one', 'execflow.agg.edit')
+    case 'write': return pair('execflow.agg.create.one', 'execflow.agg.create')
+    case 'read': case 'read_image': return pair('execflow.agg.read.one', 'execflow.agg.read')
+    case 'web_fetch': return pair('execflow.agg.fetch.one', 'execflow.agg.fetch')
+    case 'web_search': return pair('execflow.agg.searchTime.one', 'execflow.agg.searchTime')
+    case 'grep': return pair('execflow.agg.searchPattern.one', 'execflow.agg.searchPattern')
+    case 'glob': return pair('execflow.agg.list.one', 'execflow.agg.list')
+    case 'bash': case 'pwsh': return pair('execflow.agg.run.one', 'execflow.agg.run')
+    case 'run_code': return pair('execflow.agg.program.one', 'execflow.agg.program')
+    case 'todo_write': return pair('execflow.agg.todo.one', 'execflow.agg.todo')
     default: {
       const pretty = name.charAt(0).toUpperCase() + name.slice(1)
       return count > 1 ? `${pretty} ×${count}` : pretty
@@ -75,15 +82,15 @@ function actionPhrase(name: string, count: number): string {
   }
 }
 
-/** Aggregate text: chronological per-tool phrases joined: `read 1 file, edit 1 file`. */
-function aggregateText(members: readonly SlotMember[]): string {
+/** Aggregate text: chronological per-tool phrases joined: `Read 1 file, Edit 2 files`. */
+function aggregateText(members: readonly SlotMember[], t: Translate): string {
   const order: string[] = []
   const counts = new Map<string, number>()
   for (const member of members) {
     if (!counts.has(member.toolName)) order.push(member.toolName)
     counts.set(member.toolName, (counts.get(member.toolName) ?? 0) + 1)
   }
-  return order.map(name => actionPhrase(name, counts.get(name) ?? 1)).join(', ')
+  return order.map(name => actionPhrase(name, counts.get(name) ?? 1, t)).join(', ')
 }
 
 interface ExecutionSlotProps {
@@ -93,6 +100,8 @@ interface ExecutionSlotProps {
   readonly drafting: readonly SlotDrafting[]
   /** Renders one member's full row (running or settled) inside the slot. */
   readonly renderMember: (nodeKey: string) => ReactNode
+  /** The owning view's locale seat. */
+  readonly t: ChatViewSlotProps['t']
 }
 
 /** Derive the header form from members + drafting. */
@@ -111,7 +120,7 @@ function headerForm(members: readonly SlotMember[], drafting: readonly SlotDraft
 
 /** The single-slot execution view. */
 export const ExecutionSlot = memo(function ExecutionSlot({
-  members, drafting, renderMember,
+  members, drafting, renderMember, t,
 }: ExecutionSlotProps) {
   const form = headerForm(members, drafting)
   const [expanded, setExpanded] = useState(false)
@@ -165,7 +174,7 @@ export const ExecutionSlot = memo(function ExecutionSlot({
               {expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
             </span>
           </span>
-          <span className={css.aggregateText}>{aggregateText(members)}</span>
+          <span className={css.aggregateText}>{aggregateText(members, t)}</span>
         </div>
         {expanded && (
           <div className={css.body}>
@@ -178,24 +187,31 @@ export const ExecutionSlot = memo(function ExecutionSlot({
     )
   }
 
-  // Live header (drafting or running): the header row itself, expandable to
-  // the displaced members. Drafting headers show the drafting row; running
-  // headers show the member's own row wrapped as the disclosure toggle.
+  // Live header (drafting or running). The member's own row renders as the
+  // header content and KEEPS its native interactions (click expands the row's
+  // own disclosure) — the slot's expand rides a separate leading handle, so
+  // one click can never toggle both and no interactive control nests another.
   const entry = form.kind === 'drafting' ? draftingEntry(form.drafting.name) : undefined
   return (
     <div className={css.slot}>
-      <div
-        className={css.header}
-        role={expandable ? 'button' : undefined}
-        tabIndex={expandable ? 0 : undefined}
-        aria-expanded={expandable ? expanded : undefined}
-        onClick={() => { if (expandable) setExpanded(v => !v) }}
-        onKeyDown={(event) => {
-          if (expandable && (event.key === 'Enter' || event.key === ' ')) setExpanded(v => !v)
-        }}
-      >
+      <div className={css.header}>
+        {expandable && (
+          <button
+            type="button"
+            className={css.handle}
+            aria-expanded={expanded}
+            aria-label={form.kind === 'running'
+              ? t('execflow.slot.toggle', { name: form.member.toolName })
+              : t('execflow.slot.toggleDrafting', { label: entry === undefined ? '' : t(entry.key) })}
+            onClick={() => { setExpanded(v => !v) }}
+          >
+            {expanded
+              ? <IconChevronDownOutline14 />
+              : <IconChevronRightOutline14 />}
+          </button>
+        )}
         {form.kind === 'drafting' && entry !== undefined
-          ? <DraftingToolRow label={entry.label} icon={entry.icon} />
+          ? <DraftingToolRow label={t(entry.key)} icon={entry.icon} />
           : form.kind === 'running' ? renderMember(form.member.nodeKey) : null}
       </div>
       {expanded && expandable && (
@@ -203,7 +219,7 @@ export const ExecutionSlot = memo(function ExecutionSlot({
           {bodyKeys.map(key => <div key={key}>{renderMember(key)}</div>)}
           {earlierDrafting.map((d) => {
             const e = draftingEntry(d.name)
-            return e === undefined ? null : <DraftingToolRow key={`draft:${d.index}`} label={e.label} icon={e.icon} />
+            return e === undefined ? null : <DraftingToolRow key={`draft:${d.index}`} label={t(e.key)} icon={e.icon} />
           })}
         </div>
       )}
