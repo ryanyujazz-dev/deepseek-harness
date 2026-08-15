@@ -51,17 +51,25 @@ export function draftingEntry(name: string): DraftingEntry | undefined {
   return DRAFTING[name]
 }
 
-/** One drafting row: icon + label + sweep, ToolRow geometry. */
-export function DraftingToolRow({ label, icon }: {
+/** One drafting row: icon + verb (+ best-effort target path), ToolRow geometry. */
+export function DraftingToolRow({ label, icon, target }: {
   /** Stable drafting verb phrase (no mid-draft evolution by design). */
   label: string
   /** Leading glyph matching the settled row's icon. */
   icon: ReactNode
+  /** Best-effort target path (file tools), streamed in with the args. */
+  target?: string | null
 }): React.JSX.Element {
   return (
     <div className={css.row}>
       <span className={css.leading} aria-hidden>{icon}</span>
       <span className={css.label}>{label}</span>
+      {target !== undefined && target !== null && target !== '' && (
+        <>
+          <span className={css.sep} aria-hidden />
+          <span className={css.target}>{target}</span>
+        </>
+      )}
     </div>
   )
 }

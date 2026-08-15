@@ -35,6 +35,8 @@ export interface SlotDrafting {
   readonly name: string
   /** Block index in the partial, for chronological order. */
   readonly index: number
+  /** Best-effort display path (file tools) parsed from the streaming args. */
+  readonly target: string | null
 }
 
 /** Variant leading glyph for a wire tool name (mirrors GenericToolCard's table). */
@@ -217,10 +219,23 @@ export const ExecutionSlot = memo(function ExecutionSlot({
                 {expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
               </span>
             </span>
-            <span className={css.aggregateText}>{aggregateText(members, t)}</span>
+            <span className={css.aggregateText}>
+              {(() => {
+                // The title summarizes the SETTLED members, capped at the
+                // form's revision: the exiting layer of a settle-beat slide
+                // carries the OLD rev, so it renders the OLD title (the
+                // members list is live — without the cap both layers would
+                // show the new count and the slide would animate nothing).
+                const settled = members.filter(m => !m.running)
+                const summarized = f.kind === 'aggregate' && settled.length > f.rev
+                  ? settled.slice(0, f.rev)
+                  : settled
+                return aggregateText(summarized, t)
+              })()}
+            </span>
           </div>
         ) : f.kind === 'drafting' && entry !== undefined ? (
-          <DraftingToolRow label={t(entry.key)} icon={entry.icon} />
+          <DraftingToolRow label={t(entry.key)} icon={entry.icon} target={f.drafting.target} />
         ) : f.kind === 'running' ? (
           renderMember(f.member.nodeKey)
         ) : f.kind === 'single' && members[0] !== undefined ? (

@@ -26,6 +26,32 @@ import css from './ChatView.module.css'
 const FOLLOW_THRESHOLD = 24
 const EMPTY_DRAFTING: readonly SlotDrafting[] = []
 
+/**
+ * Best-effort target for a drafting file tool (edit/write), parsed from the
+ * still-streaming args. Truncated JSON (the path has not arrived yet) yields
+ * null, so the drafting row shows the verb alone until the target is known.
+ * Only the file NAME shows in the title (`src/foo.ts` → `foo.ts`), matching
+ * the settled file rows.
+ * @param argsRaw - the streaming tool-call args fragment.
+ * @param name - wire tool name (file tools only carry a target).
+ * @returns the file name, or null when unknown.
+ */
+function draftingTarget(argsRaw: string, name: string): string | null {
+  if (name !== 'edit' && name !== 'write') return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(argsRaw)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null
+  const args = parsed as Record<string, unknown>
+  const raw = args['file_path'] ?? args['path']
+  if (typeof raw !== 'string' || raw === '') return null
+  const slash = Math.max(raw.lastIndexOf('/'), raw.lastIndexOf('\\'))
+  return slash === -1 ? raw : raw.slice(slash + 1)
+}
+
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
   return (from.closest('[data-conversation-scroll]')) ?? from
@@ -233,7 +259,7 @@ export function ChatView({
     const list: SlotDrafting[] = []
     partial.blocks.forEach((block, index) => {
       if (block.kind === 'tool-call' && block.name !== '') {
-        list.push({ name: block.name, index })
+        list.push({ name: block.name, index, target: draftingTarget(block.argsRaw, block.name) })
       }
     })
     return { list, turn: partial.turn }

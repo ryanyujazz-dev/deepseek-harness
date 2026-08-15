@@ -270,6 +270,48 @@ describe('ExecFlow partition and slot forms', () => {
     expect(r2.container.textContent).not.toContain('Reading')
   })
 
+  it('a drafting row shows the target file once the streaming args carry it', () => {
+    // Complete args: the verb and the target file NAME both render (paths
+    // collapse to the basename, matching the settled file rows).
+    const complete = makeHarness({
+      nodes: [user(1, 'go')],
+      partial: {
+        turn: 1, step: 2,
+        blocks: [{ kind: 'tool-call', callId: 'call-9', name: 'edit', argsRaw: '{"file_path":"src/foo.ts"}' }],
+      },
+    })
+    const full = render(<complete.ChatView {...complete.props} />)
+    expect(full.container.textContent).toContain('Editing')
+    expect(full.container.textContent).toContain('foo.ts')
+    expect(full.container.textContent).not.toContain('src/foo.ts')
+    full.unmount()
+
+    // Truncated mid-stream JSON: the verb shows without a path.
+    const truncated = makeHarness({
+      nodes: [user(1, 'go')],
+      partial: {
+        turn: 1, step: 2,
+        blocks: [{ kind: 'tool-call', callId: 'call-9', name: 'edit', argsRaw: '{"file_path":"b.' }],
+      },
+    })
+    const partial = render(<truncated.ChatView {...truncated.props} />)
+    expect(partial.container.textContent).toContain('Editing')
+    expect(partial.container.textContent).not.toContain('b.')
+    partial.unmount()
+
+    // Non-file tools never show a target fragment.
+    const runCode = makeHarness({
+      nodes: [user(1, 'go')],
+      partial: {
+        turn: 1, step: 2,
+        blocks: [{ kind: 'tool-call', callId: 'call-9', name: 'run_code', argsRaw: '{"code":"x()"}' }],
+      },
+    })
+    const code = render(<runCode.ChatView {...runCode.props} />)
+    expect(code.container.textContent).toContain('Coding')
+    expect(code.container.querySelectorAll('[class*="target"]')).toHaveLength(0)
+  })
+
   it('an expanded aggregate header shows the summary title, not the live member', async () => {
     // One run: call-1 settled, call-2 running (same turn — the runningCall
     // fixture defaults to turn 2, so override it to join the run).
