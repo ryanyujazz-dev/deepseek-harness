@@ -136,15 +136,17 @@
 }
 
 /* Truncation masks: the conversation background fading in over the window's
-   top and bottom edges (12px), signaling clipped content. Overlays render
-   after the text (painted above it) and never intercept pointers. The bottom
-   band stops above the Show more line (24px line + 4px margin). */
+   top and bottom edges — one line-height (24px) tall, starting at the text
+   inset so the icon-axis rail stays untouched, painted above the text and
+   pointer-transparent. Each band renders only while its edge actually hides
+   content (the component probes scroll position); the bottom band stops
+   above the Show more line (24px line + 4px margin). */
 .maskTop,
 .maskBottom {
   position: absolute;
-  left: 0;
+  left: 22px;
   right: 0;
-  height: 12px;
+  height: 24px;
   pointer-events: none;
 }
 

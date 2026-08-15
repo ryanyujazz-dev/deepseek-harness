@@ -34,6 +34,8 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [full, setFull] = useState(false)
   const [overflowing, setOverflowing] = useState(false)
+  const [canScrollUp, setCanScrollUp] = useState(false)
+  const [canScrollDown, setCanScrollDown] = useState(false)
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const summaryRef = useRef<HTMLSpanElement>(null)
   const summary = running ? latestLine(text) : firstLine(text)
@@ -46,13 +48,24 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
     scheduleSummaryScroll()
   }, [running, scheduleSummaryScroll, summary])
 
-  // Clamped body bookkeeping: detect overflow past the 15-line window and,
-  // while streaming, keep the window pinned to the newest text.
-  useLayoutEffect(() => {
+  // Clamped body bookkeeping: detect overflow past the 15-line window and
+  // which edges still hide content, and, while streaming, keep the window
+  // pinned to the newest text. The same probe runs on reader scrolls, so the
+  // edge masks track the window instead of the content.
+  const probeWindow = (): void => {
     const element = bodyRef.current
-    if (element === null || full) return
+    if (element === null) return
     setOverflowing(element.scrollHeight > element.clientHeight + 1)
-    if (running) element.scrollTop = element.scrollHeight
+    setCanScrollUp(element.scrollTop > 1)
+    setCanScrollDown(element.scrollTop + element.clientHeight < element.scrollHeight - 1)
+  }
+  useLayoutEffect(() => {
+    if (bodyRef.current === null || full) return
+    if (running) {
+      const element = bodyRef.current
+      element.scrollTop = element.scrollHeight
+    }
+    probeWindow()
   }, [text, running, full, expanded])
 
   return (
@@ -77,13 +90,9 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
         )}
       >
         <div className={css.thinkBody} data-clamped={!full || undefined}>
-          <div className={css.thinkScroll} ref={bodyRef}>{text}</div>
-          {!full && overflowing && (
-            <>
-              <div className={css.maskTop} aria-hidden />
-              <div className={css.maskBottom} aria-hidden />
-            </>
-          )}
+          <div className={css.thinkScroll} ref={bodyRef} onScroll={probeWindow}>{text}</div>
+          {!full && overflowing && canScrollUp && <div className={css.maskTop} aria-hidden />}
+          {!full && overflowing && canScrollDown && <div className={css.maskBottom} aria-hidden />}
           {overflowing && (
             <button
               type="button"
