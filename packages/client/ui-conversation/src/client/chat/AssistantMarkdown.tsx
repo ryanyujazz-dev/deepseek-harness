@@ -29,13 +29,15 @@ export interface AssistantMarkdownProps {
   loadImage?: ImageLoader
   /** Resolved prose file mentions for this Assistant's closing turn. */
   mentions?: MarkdownFileMentions | undefined
+  /** Think rows start expanded (the Think display form). */
+  thinkExpanded?: boolean | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
 
 /** Reasoning block as the Think variant summary row (figma 39:28304). */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
-  blocks, streaming, interrupted, loadImage, mentions, t,
+  blocks, streaming, interrupted, loadImage, mentions, thinkExpanded, t,
 }: AssistantMarkdownProps) {
   const imageLoader = loadImage ?? (() => Promise.reject(new Error(t('image.serviceUnavailable'))))
   // Stable per locale revision (t identity changes on switch): a fresh object
@@ -66,7 +68,15 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         )
         break
       case 'reasoning':
-        rendered.push(<ReasoningRow key={i} text={block.text} running={streaming && i === last} t={t} />)
+        rendered.push(
+          <ReasoningRow
+            key={i}
+            text={block.text}
+            running={streaming && i === last}
+            defaultExpanded={thinkExpanded ?? false}
+            t={t}
+          />,
+        )
         break
       case 'image': {
         // Consecutive image blocks share one gallery so several images tile
@@ -85,7 +95,10 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         rendered.push(<ImageGallery key={start} images={group} load={imageLoader} align="start" labels={messageImageLabels(t)} />)
         break
       }
-      // Grouped into tool rows by ChatView; hasVisible above skips an empty shell.
+      // Tool-call blocks render through ExecutionSlot (the step's single
+      // morphing slot owns both the drafting and landed phases). The partial
+      // skips them here to avoid double rows; settled messages never carried
+      // them into markdown anyway.
       case 'tool-call':
         break
       default:

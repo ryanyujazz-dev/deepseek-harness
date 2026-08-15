@@ -2,6 +2,22 @@
   border-radius: 6px;
 }
 
+/* ExecFlow live-text treatment: while a call runs (start → done), every part
+   of its row — title, summary, file links, whichever keyed toolview renders
+   it — reads at full content color so in-flight work reads as live text.
+   This descendant rule sits at the call-row wrapper (above each toolview's
+   own module CSS in the cascade) so one rule covers ToolRow and every keyed
+   specialized view without editing their per-file tokens. Settled states
+   (ok/error/stopped) keep each view's own muted styles. */
+.callRow :is([data-state='running']) :is(
+  [class*='title'],
+  [class*='summary']:not([class*='Suffix']),
+  [class*='fileLink'],
+  [class*='leading']
+):not([class*='errorSummary']):not([class*='chevron']):not([class*='visuallyHidden']) {
+  color: var(--dsw-alias-label-primary) !important;
+}
+
 .subCalls {
   display: flex;
   flex-direction: column;

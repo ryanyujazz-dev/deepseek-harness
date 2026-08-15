@@ -12,16 +12,19 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { ExecutionSlot, type SlotDrafting, type SlotMember } from './ExecutionSlot.tsx'
+import { ViewModeMenu } from './ViewModeMenu.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
+const EMPTY_DRAFTING: readonly SlotDrafting[] = []
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -104,12 +107,17 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
 }
 
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
-function TurnStatus({ startTime, t }: {
+function TurnStatus({ startTime, t, thinkMode, onToggleThinkMode, showThinkSwitch }: {
   /** The running turn's logged `turn/start` time; null falls back to mount
    *  time when that boundary is outside the window. */
   startTime: number | null
   /** The owning view's locale seat. */
   t: ChatViewSlotProps['t']
+  /** Active think display form; the Thinking chip switches it live. */
+  thinkMode: ThinkMode
+  onToggleThinkMode: () => void
+  /** Only while the model is thinking right now (streaming reasoning blocks). */
+  showThinkSwitch: boolean
 }) {
   const [mountedAt] = useState(() => Date.now())
   // Anchored to turn/start so a mid-turn reload keeps the real
@@ -135,8 +143,35 @@ function TurnStatus({ startTime, t }: {
           {formatRunDuration(elapsedMs, t)}
         </span>
       )}
+      {showThinkSwitch && (
+        <button
+          type="button"
+          className={css.thinkToggle}
+          aria-pressed={thinkMode === 'compact'}
+          title={thinkMode === 'compact' ? t('execflow.status.showThink') : t('execflow.status.hideThink')}
+          onClick={onToggleThinkMode}
+        >
+          {t('execflow.status.thinking')}
+        </button>
+      )}
     </div>
   )
+}
+
+/** Think display form: inline ReasoningRows in the flow (A) vs hidden from the
+ * flow entirely — content-anchored aggregation (B). Persisted per browser. */
+export type { ThinkMode } from '../contract/slots.ts'
+import type { ThinkMode } from '../contract/slots.ts'
+
+const THINK_MODE_KEY = 'dsh.execflow.think-mode'
+
+function readThinkMode(): ThinkMode {
+  try {
+    const value = window.localStorage.getItem(THINK_MODE_KEY)
+    return value === 'compact' ? 'compact' : 'inline'
+  } catch {
+    return 'inline'
+  }
 }
 
 /**
@@ -159,12 +194,182 @@ export function ChatView({
   const hasMore = useSession(s => s.hasMore)
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
+  const [thinkMode, setThinkMode] = useState<ThinkMode>(readThinkMode)
+  const writeThinkMode = useCallback((next: ThinkMode) => {
+    setThinkMode(next)
+    try {
+      window.localStorage.setItem(THINK_MODE_KEY, next)
+    } catch {
+      // Persistence failure keeps the in-memory mode for this session.
+    }
+  }, [])
+  const toggleThinkMode = useCallback(() => {
+    setThinkMode((previous: ThinkMode) => {
+      const next: ThinkMode = previous === 'inline' ? 'compact' : 'inline'
+      try {
+        window.localStorage.setItem(THINK_MODE_KEY, next)
+      } catch {
+        // Persistence failure keeps the in-memory mode for this session.
+      }
+      return next
+    })
+  }, [])
 
   const pendingSteering = useMemo(
     () => inbox.filter(item => item.placement === 'steering'),
     [inbox],
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
+
+  const partial = useSession(s => s.partial)
+
+  // Drafting signature: names+count of the partial's tool-call blocks. The
+  // partition only cares about THIS shape — text deltas inside the partial
+  // change the object identity every token but never the signature, so the
+  // O(entries) rescan below runs only when a drafting block actually appears,
+  // renames, or lands.
+  const partialDrafting = useMemo(() => {
+    if (partial === null) return { list: EMPTY_DRAFTING, turn: null as number | null }
+    const list: SlotDrafting[] = []
+    partial.blocks.forEach((block, index) => {
+      if (block.kind === 'tool-call' && block.name !== '') {
+        list.push({ name: block.name, index })
+      }
+    })
+    return { list, turn: partial.turn }
+  }, [partial])
+  const draftingList = partialDrafting.list
+  const draftingTurn = partialDrafting.turn
+
+  // ExecFlow single-slot partitioning: contiguous tool-call nodes form one
+  // execution run rendered through ExecutionSlot (one morphing header,
+  // expandable body). The anchor depends on the think form — inline: a node
+  // splits runs whenever it renders ANY visible flow content (think rows
+  // included), so runs stay step-scoped; compact: think renders nothing, so
+  // only content-bearing nodes (text/images, user bubbles, errors) split —
+  // runs aggregate across steps between content anchors.
+  const flow = useMemo(() => {
+    type Entry =
+      | { kind: 'node'; nodeKey: string }
+      | { kind: 'run'; turn: number | null; seq: number; members: SlotMember[]; stepStart: number | null; stepEnd: number | null }
+    const entries: Entry[] = []
+    let runSeq = 0
+    const toolNameOf = (nodeKey: string): string | undefined => {
+      const node = nodeStore.get(nodeKey)
+      if (node === undefined || node.kind !== 'tool-call') return undefined
+      const root = (node.data as { root?: object }).root
+      if (root === undefined || typeof root !== 'object') return ''
+      // Running form carries `name`; the settled ToolResultNode carries it
+      // under `call.name`. Both are run members.
+      if (!('kind' in root)) {
+        const name = (root as { name?: unknown }).name
+        return typeof name === 'string' ? name : ''
+      }
+      const call = (root as { call?: { name?: unknown } }).call
+      return typeof call?.name === 'string' ? call.name : ''
+    }
+    const runningOf = (nodeKey: string): boolean => {
+      const node = nodeStore.get(nodeKey)
+      if (node === undefined || node.kind !== 'tool-call') return false
+      const root = (node.data as { root?: object }).root
+      return root !== undefined && typeof root === 'object' && !('kind' in root)
+    }
+    /** Whether one assistant-step node renders visible flow content in the
+     * active think form (its tool-call blocks never render inline). */
+    const stepHasVisibleContent = (nodeKey: string): boolean => {
+      const node = nodeStore.get(nodeKey)
+      if (node === undefined || node.kind !== 'assistant-step') return true
+      const blocks = (node.data as { blocks: readonly { kind: string }[] }).blocks
+      // Compact form: reasoning renders nothing, so a reasoning-only step is
+      // transparent — its tools merge with the surrounding run.
+      return thinkMode === 'inline'
+        ? blocks.some(block => block.kind !== 'tool-call')
+        : blocks.some(block => block.kind !== 'tool-call' && block.kind !== 'reasoning')
+    }
+    for (const nodeKey of order) {
+      const node = nodeStore.get(nodeKey)
+      const name = node !== undefined ? toolNameOf(nodeKey) : undefined
+      const isTool = name !== undefined
+      const last = entries[entries.length - 1]
+      const location = node?.location
+      const turn = location?.kind === 'step' || location?.kind === 'turn'
+        ? location.turn.turn
+        : null
+      const lastRun = last?.kind === 'run' ? last : undefined
+      const lastMember = lastRun?.members[lastRun.members.length - 1]
+      // Content anchor: a run extends through nodes that are invisible in the
+      // active form (transparent), and never across a different turn.
+      if (isTool && lastRun !== undefined && lastMember !== undefined && turn !== null) {
+        const lastLocation = nodeStore.get(lastMember.nodeKey)?.location
+        const lastTurn = lastLocation?.kind === 'step' || lastLocation?.kind === 'turn'
+          ? lastLocation.turn.turn
+          : null
+        if (turn === lastTurn) {
+          lastRun.members.push({ nodeKey, toolName: name, running: runningOf(nodeKey) })
+          continue
+        }
+      }
+      if (isTool) {
+        const stepLocation = location?.kind === 'step' ? location.step : undefined
+        entries.push({
+          kind: 'run',
+          turn,
+          seq: runSeq++,
+          members: [{ nodeKey, toolName: name, running: runningOf(nodeKey) }],
+          stepStart: stepLocation?.start?.time ?? null,
+          stepEnd: stepLocation?.end?.time ?? null,
+        })
+        continue
+      }
+      // A transparent node (think-only assistant step in compact form) neither
+      // splits the flow nor renders — skip it entirely so the surrounding runs
+      // join. Everything else is a visible anchor that splits runs.
+      if (node !== undefined && node.kind === 'assistant-step' && !stepHasVisibleContent(nodeKey)) {
+        continue
+      }
+      entries.push({ kind: 'node', nodeKey })
+    }
+    // Drafting blocks of the CURRENT partial belong to the streaming step:
+    // attach them to the LAST run entry only (a run of the same turn), or —
+    // before the first tool/call lands and the run entry exists — carry them
+    // as a pending run so the slot can render the drafting header.
+    const drafting = draftingList
+    let draftingForLastRun = false
+    if (drafting.length > 0 && draftingTurn !== null) {
+      const last = entries[entries.length - 1]
+      const firstMember = last?.kind === 'run' ? last.members[0] : undefined
+      if (firstMember !== undefined) {
+        const lastLocation = nodeStore.get(firstMember.nodeKey)?.location
+        draftingForLastRun = (lastLocation?.kind === 'step' || lastLocation?.kind === 'turn')
+          && lastLocation.turn.turn === draftingTurn
+      } else {
+        // No run yet for the streaming step (the last entry is a plain node or
+        // the flow is empty): create a pending (empty) run that renders the
+        // drafting header at the flow tail.
+        entries.push({ kind: 'run', turn: draftingTurn, seq: runSeq++, members: [], stepStart: null, stepEnd: null })
+        draftingForLastRun = true
+      }
+    }
+    return { entries, drafting: draftingForLastRun ? draftingList : [] }
+  }, [order, nodeStore, thinkMode, draftingList, draftingTurn])
+
+  /** One member's full row through the node seat (running or settled styling). */
+  const renderMember = useCallback((nodeKey: string) => (
+    <ChatNodeSeat
+      nodeKey={nodeKey}
+      thinkMode={thinkMode}
+      useSession={useSession}
+      selectedCallId={selectedCallId}
+      cwd={cwd}
+      openFile={openFile}
+      inspectCall={inspectCall}
+      forkAt={forkAt}
+      loadImage={loadImage}
+      fileMentions={fileMentions}
+      renderSlot={renderSlot}
+      t={t}
+    />
+  ), [useSession, thinkMode, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions, renderSlot, t])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -364,6 +569,8 @@ export function ChatView({
 
   return (
     <div className={css.root}>
+      {/* Display-mode picker (Normal / Think), floating at the conversation column's top-left. */}
+      <ViewModeMenu thinkMode={thinkMode} onSetMode={writeThinkMode} t={t} />
       <div ref={listRef} className={css.scroll}>
         <div ref={columnRef} className={css.column} data-chat-flow="">
           {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
@@ -379,10 +586,11 @@ export function ChatView({
               </button>
             </div>
           )}
-          {order.map(nodeKey => (
+          {flow.entries.map((entry, index) => entry.kind === 'node' ? (
             <ChatNodeSeat
-              key={nodeKey}
-              nodeKey={nodeKey}
+              key={entry.nodeKey}
+              nodeKey={entry.nodeKey}
+              thinkMode={thinkMode}
               useSession={useSession}
               selectedCallId={selectedCallId}
               cwd={cwd}
@@ -394,13 +602,40 @@ export function ChatView({
               renderSlot={renderSlot}
               t={t}
             />
+          ) : (
+            <ExecutionSlot
+              /* Key stability: a landed run keys on its first member; the
+                 pending drafting run keys on the partial's turn — the run it
+                 BECOMES — so landing the first member keeps the identity (no
+                 remount, expansion survives). */
+              key={`run:t-${entry.turn ?? 'root'}-${entry.seq}`}
+              members={entry.members}
+              /* The partial's drafting blocks belong to ONE run — the LAST
+                 entry (the partition either matched the partial's turn on
+                 the trailing run or created a pending run for it). Feeding
+                 them to earlier slots turned every aggregate head into the
+                 drafting row while a call was being composed. */
+              drafting={index === flow.entries.length - 1 ? flow.drafting : []}
+              renderMember={renderMember}
+              t={t}
+            />
           ))}
           {/* No pending placeholders: questions (ui-user-questions) and approvals
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}
           {/* Turn-level loading signal: rides the whole running turn (first-token
-              wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
+              wait, tool execution, streaming) so it never flickers per step.
+              The Thinking switch shows only while the model is actually
+              thinking this moment (streaming reasoning blocks in the partial). */}
+          {running && (
+            <TurnStatus
+              startTime={runningTurnStart}
+              t={t}
+              thinkMode={thinkMode}
+              onToggleThinkMode={toggleThinkMode}
+              showThinkSwitch={partial !== null && partial.blocks.some(block => block.kind === 'reasoning')}
+            />
+          )}
           {pendingSteering.map(item => (
             <PendingSteeringBubble key={item.id} content={item.content} loadImage={loadImage} t={t} />
           ))}

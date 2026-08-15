@@ -20,7 +20,7 @@
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
+  CodeBlock, DiffBlock, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, Tooltip, WebBlock,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WebBlockProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -29,6 +29,7 @@ import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-mod
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
 import type { ToolRowState, ToolRowVariant } from '../models/tool-call-model.ts'
+import { ExecDisclosureRow } from './ExecDisclosureRow.tsx'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
@@ -194,7 +195,7 @@ export function ToolRow({
   return (
     <div className={css.root} data-variant={variant} data-tool={toolName} data-state={state}>
       {status !== null && <span className={css.visuallyHidden}>{status}</span>}
-      <DisclosureRow
+      <ExecDisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
         titleClassName={css.title}
@@ -291,17 +292,19 @@ export function ToolRow({
                       </>
                     )}
           {inspect !== undefined && (
-            <button
-              type="button"
-              className={css.inspectButton}
-              onClick={inspect}
-            >
-              <IconInspectOutline12 />
-              Inspect
-            </button>
+            <Tooltip label={t('execflow.inspect')} side="bottom">
+              <button
+                type="button"
+                className={css.inspectButton}
+                aria-label={t('execflow.inspect')}
+                onClick={inspect}
+              >
+                <IconInspectOutline12 />
+              </button>
+            </Tooltip>
           )}
         </div>
-      </DisclosureRow>
+      </ExecDisclosureRow>
     </div>
   )
 }

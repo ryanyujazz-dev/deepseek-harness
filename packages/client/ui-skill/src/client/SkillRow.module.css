@@ -1,6 +1,7 @@
 /* Skill toolview: Bash-matched summary row plus a bounded instructions disclosure. */
 
 .card {
+  position: relative; /* hover-revealed Inspect overlay anchor */
   display: flex;
   flex-direction: column;
 }
@@ -108,15 +109,29 @@
 }
 
 .bodyWrap {
+  position: relative; /* expanded-body rail anchor */
   display: flex;
   flex-direction: column;
+}
+
+/* ExecFlow: the expanded body carries the think-style rail on the icon
+   centerline (x=8; 7.5 + 1/2), exactly like ToolRow's expanded block. */
+.bodyWrap::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 7.5px;
+  width: 1px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
 }
 
 .instructionsCard {
   display: flex;
   flex-direction: column;
   max-height: 260px;
-  margin: 4px 0 4px 4px;
+  margin: 4px 0 4px 22px;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 12px;
@@ -161,32 +176,35 @@
   margin: 6px 0;
 }
 
+/* ExecFlow Inspect affordance: an icon-only hover-revealed overlay at the
+   title row's top-right corner (Tooltip on hover), mirroring ToolRow's
+   geometry exactly — absolute so it costs no line of layout. */
 .inspectButton {
+  position: absolute;
+  top: -22px;
+  right: 0;
   display: inline-flex;
-  align-self: flex-start;
   align-items: center;
-  gap: 4px;
-  margin: 4px 0 2px 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 999px;
-  background: var(--dsw-alias-bg-base);
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-  line-height: 16px;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
   opacity: 0;
   transition: opacity 100ms ease;
+  z-index: 1;
+}
+
+.inspectButton:hover {
+  color: var(--dsw-alias-label-primary);
 }
 
 .card:hover .inspectButton,
 .inspectButton:focus-visible {
   opacity: 1;
-}
-
-.inspectButton:hover {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
-  color: var(--dsw-alias-label-primary);
 }
 
 .visuallyHidden {

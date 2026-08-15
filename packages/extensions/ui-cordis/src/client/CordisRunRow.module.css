@@ -13,7 +13,7 @@
 .icon {
   display: inline-flex;
   flex: none;
-  margin-right: 8px;
+  margin-right: 6px; /* the unified flow-row leading gap (16 + 6) */
   color: var(--dsw-alias-state-business-primary);
 }
 
@@ -97,6 +97,7 @@
 }
 
 .message {
+  margin-left: 22px; /* aligned to the title text's left edge */
   padding: 8px 12px;
   border-radius: 8px;
   background: var(--dsw-alias-button-ghost-active-fill);
@@ -106,6 +107,7 @@
 }
 
 .business {
+  margin-left: 22px; /* aligned to the title text's left edge */
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -114,7 +116,7 @@
 }
 
 .output {
-  margin: 0;
+  margin: 0 0 0 22px; /* aligned to the title text's left edge */
   padding: 10px 12px;
   overflow: auto;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -129,4 +131,5 @@
 .business .output {
   border: none;
   border-radius: 0;
+  margin-left: 0; /* already inside the aligned business card */
 }

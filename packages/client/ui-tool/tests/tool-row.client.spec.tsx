@@ -214,11 +214,13 @@ describe('ToolRow', () => {
     expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('row click expands: chevron leading, summary kept inline, body in the scrolling card', () => {
+  it('row click expands: the icon stays in every state (ExecFlow chrome), summary kept inline, body in the scrolling card', () => {
     const view = render(<ToolRow {...rowProps} />)
     fireEvent.click(view.getByRole('button'))
-    expect(view.queryByTestId('tool-icon')).toBeNull()
-    expect(view.container.querySelector('svg')).not.toBeNull()
+    // ExecDisclosureRow: the leading glyph keeps the row's own icon while
+    // open; the chevron is a hover-only overlay.
+    expect(view.queryByTestId('tool-icon')).not.toBeNull()
+    expect(view.container.querySelector('[class*="chevronHover"]')).not.toBeNull()
     expect(view.getByText('List files')).toBeTruthy()
     expect(view.getByText(/"a": 1/)).toBeTruthy()
     expect(view.container.querySelector('[class*="ioCard"]')).not.toBeNull()
@@ -335,23 +337,23 @@ describe('ToolRow', () => {
     expect(view.container.querySelector('[class*="fileLink"]')).toBeNull()
   })
 
-  it('the expanded body carries a hover Inspect pill that fires the callback', () => {
+  it('the expanded body carries an icon-only Inspect overlay that fires the callback', () => {
     const inspect = vi.fn()
     const view = render(<ToolRow {...rowProps} inspect={inspect} />)
-    // Collapsed: no pill.
-    expect(view.queryByText('Inspect')).toBeNull()
+    // Collapsed: no overlay.
+    expect(view.queryByLabelText('Inspect')).toBeNull()
     fireEvent.click(view.getByRole('button', { name: /Bash/ }))
-    const pill = view.getByText('Inspect')
-    fireEvent.click(pill)
+    const overlay = view.getByLabelText('Inspect')
+    fireEvent.click(overlay)
     expect(inspect).toHaveBeenCalledTimes(1)
-    // The pill click must not collapse the row (body is a .row sibling).
+    // The overlay click must not collapse the row (body is a .row sibling).
     expect(view.getByRole('button', { name: /Bash/ }).getAttribute('aria-expanded')).toBe('true')
   })
 
-  it('no inspect callback, no pill', () => {
+  it('no inspect callback, no overlay', () => {
     const view = render(<ToolRow {...rowProps} />)
     fireEvent.click(view.getByRole('button'))
-    expect(view.queryByText('Inspect')).toBeNull()
+    expect(view.queryByLabelText('Inspect')).toBeNull()
   })
 
   it('the expanded card gutter-labels each section it carries (IN / OUT)', () => {
@@ -421,11 +423,11 @@ describe('GenericToolCard', () => {
     expect(view.container.querySelector('svg')).not.toBeNull()
   })
 
-  it('passes the owner inspect callback through to the expanded row pill', () => {
+  it('passes the owner inspect callback through to the expanded row overlay', () => {
     const inspect = vi.fn()
     const view = render(<GenericToolCard {...props('bash', result())} inspect={inspect} />)
     fireEvent.click(view.getByRole('button', { name: /Bash/ }))
-    fireEvent.click(view.getByText('Inspect'))
+    fireEvent.click(view.getByLabelText('Inspect'))
     expect(inspect).toHaveBeenCalledTimes(1)
   })
 
