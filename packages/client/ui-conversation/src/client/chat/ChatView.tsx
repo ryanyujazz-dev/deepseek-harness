@@ -589,7 +589,12 @@ export function ChatView({
             <ExecutionSlot
               key={`run:${entry.members[0]?.nodeKey ?? index}`}
               members={entry.members}
-              drafting={flow.drafting}
+              /* The partial's drafting blocks belong to ONE run — the LAST
+                 entry (the partition either matched the partial's turn on
+                 the trailing run or created a pending run for it). Feeding
+                 them to earlier slots turned every aggregate head into the
+                 drafting row while a call was being composed. */
+              drafting={index === flow.entries.length - 1 ? flow.drafting : []}
               renderMember={renderMember}
             />
           ))}
