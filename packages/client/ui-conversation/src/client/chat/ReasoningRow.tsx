@@ -1,6 +1,6 @@
 /** Assistant reasoning disclosure, independent of Tool-call presentation. */
 import { IconThinkOutline14, ExecDisclosureRow } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
 import a11yCss from './accessibility.module.css'
@@ -32,6 +32,9 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
   t: ChatViewSlotProps['t']
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
+  const [full, setFull] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
   const summaryRef = useRef<HTMLSpanElement>(null)
   const summary = running ? latestLine(text) : firstLine(text)
   const scheduleSummaryScroll = useThrottledVisualUpdate(() => {
@@ -42,6 +45,15 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
   useEffect(() => {
     scheduleSummaryScroll()
   }, [running, scheduleSummaryScroll, summary])
+
+  // Clamped body bookkeeping: detect overflow past the 15-line window and,
+  // while streaming, keep the window pinned to the newest text.
+  useLayoutEffect(() => {
+    const element = bodyRef.current
+    if (element === null || full) return
+    setOverflowing(element.scrollHeight > element.clientHeight + 1)
+    if (running) element.scrollTop = element.scrollHeight
+  }, [text, running, full, expanded])
 
   return (
     <div className={css.root} data-variant="think" data-state={running ? 'running' : 'ok'}>
@@ -64,7 +76,16 @@ export function ReasoningRow({ text, running, defaultExpanded = false, t }: {
           </>
         )}
       >
-        <div className={css.thinkBody}>{text}</div>
+        <div className={css.thinkBody} ref={bodyRef} data-clamped={!full || undefined}>{text}</div>
+        {overflowing && (
+          <button
+            type="button"
+            className={css.thinkMore}
+            onClick={() => { setFull(value => !value) }}
+          >
+            {full ? 'Show less' : 'Show more'}
+          </button>
+        )}
       </ExecDisclosureRow>
     </div>
   )

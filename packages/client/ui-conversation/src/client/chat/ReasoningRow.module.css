@@ -96,3 +96,29 @@
     animation: none;
   }
 }
+
+/* Clamped streaming view: 15 line-heights (24px each) plus the body's own
+   vertical padding; overflow scrolls (auto-pinned to the tail while
+   running). `full` removes the clamp entirely. */
+.thinkBody[data-clamped] {
+  max-height: calc(24px * 15 + 8px);
+  overflow-y: auto;
+}
+
+/* Plain-text reveal toggle under the body, aligned with the body text's
+   left inset; tertiary at rest, brightens on hover (token-driven, adapts
+   to light and dark themes). */
+.thinkMore {
+  margin: 2px 0 0 22px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.thinkMore:hover {
+  color: var(--dsw-alias-label-primary);
+}
