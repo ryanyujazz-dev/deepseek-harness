@@ -202,8 +202,8 @@
    no line of layout. */
 .inspectButton {
   position: absolute;
-  top: 4px;
-  right: 0;
+  top: 13px;
+  right: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -251,4 +251,9 @@
   width: 1px;
   background: var(--dsw-alias-border-l2);
   pointer-events: none;
+}
+
+.root:hover .inspectButton,
+.inspectButton:focus-visible {
+  opacity: 1;
 }

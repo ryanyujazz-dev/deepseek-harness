@@ -176,8 +176,8 @@
    no line of layout. */
 .inspectButton {
   position: absolute;
-  top: 4px;
-  right: 0;
+  top: 13px;
+  right: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -195,6 +195,11 @@
 
 .inspectButton:hover {
   color: var(--dsw-alias-label-primary);
+}
+
+.root:hover .inspectButton,
+.inspectButton:focus-visible {
+  opacity: 1;
 }
 
 /* Expanded-body scroll wrapper for the run_code CodeBlock; the IN/OUT card
