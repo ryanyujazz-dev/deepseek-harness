@@ -251,8 +251,9 @@ export function ChatView({
   const flow = useMemo(() => {
     type Entry =
       | { kind: 'node'; nodeKey: string }
-      | { kind: 'run'; turn: number | null; members: SlotMember[]; stepStart: number | null; stepEnd: number | null }
+      | { kind: 'run'; turn: number | null; seq: number; members: SlotMember[]; stepStart: number | null; stepEnd: number | null }
     const entries: Entry[] = []
+    let runSeq = 0
     const toolNameOf = (nodeKey: string): string | undefined => {
       const node = nodeStore.get(nodeKey)
       if (node === undefined || node.kind !== 'tool-call') return undefined
@@ -313,6 +314,7 @@ export function ChatView({
         entries.push({
           kind: 'run',
           turn,
+          seq: runSeq++,
           members: [{ nodeKey, toolName: name, running: runningOf(nodeKey) }],
           stepStart: stepLocation?.start?.time ?? null,
           stepEnd: stepLocation?.end?.time ?? null,
@@ -344,7 +346,7 @@ export function ChatView({
         // No run yet for the streaming step (the last entry is a plain node or
         // the flow is empty): create a pending (empty) run that renders the
         // drafting header at the flow tail.
-        entries.push({ kind: 'run', turn: draftingTurn, members: [], stepStart: null, stepEnd: null })
+        entries.push({ kind: 'run', turn: draftingTurn, seq: runSeq++, members: [], stepStart: null, stepEnd: null })
         draftingForLastRun = true
       }
     }
@@ -606,7 +608,7 @@ export function ChatView({
                  pending drafting run keys on the partial's turn — the run it
                  BECOMES — so landing the first member keeps the identity (no
                  remount, expansion survives). */
-              key={`run:t-${entry.turn ?? 'root'}`}
+              key={`run:t-${entry.turn ?? 'root'}-${entry.seq}`}
               members={entry.members}
               /* The partial's drafting blocks belong to ONE run — the LAST
                  entry (the partition either matched the partial's turn on

@@ -64,9 +64,16 @@ export function isAnimatedHeaderSwap(prev: HeaderForm, next: HeaderForm): boolea
   return true
 }
 
+/** Live prefers-reduced-motion source; queried lazily per decision so both
+ *  a mid-session system toggle and late-mounted environments (the query is
+ *  not captured at import time) take effect on the next swap. */
+let reducedMotionQuery: MediaQueryList | null | undefined
+
 function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  reducedMotionQuery ??= typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : null
+  return reducedMotionQuery?.matches ?? false
 }
 
 /**
@@ -79,7 +86,7 @@ export function useHeaderTransition(target: HeaderForm): HeaderLayerState {
   const stateRef = useRef(state)
   const pendingRef = useRef<HeaderForm | null>(null)
   const timerRef = useRef<number | undefined>(undefined)
-  const reducedRef = useRef<boolean>(prefersReducedMotion())
+
   const onEndRef = useRef<() => void>(() => {})
 
   const apply = (next: HeaderLayerState): void => {
@@ -105,7 +112,7 @@ export function useHeaderTransition(target: HeaderForm): HeaderLayerState {
         if (current.outgoing !== null) apply({ shown: current.shown, outgoing: null, gen: current.gen })
         return
       }
-      if (reducedRef.current || !isAnimatedHeaderSwap(current.shown, pending)) {
+      if (prefersReducedMotion() || !isAnimatedHeaderSwap(current.shown, pending)) {
         apply({ shown: pending, outgoing: null, gen: current.gen })
         return
       }
@@ -120,7 +127,7 @@ export function useHeaderTransition(target: HeaderForm): HeaderLayerState {
     const current = stateRef.current
     if (current.outgoing === null) {
       if (sameHeaderForm(current.shown, target)) return
-      if (reducedRef.current || !isAnimatedHeaderSwap(current.shown, target)) {
+      if (prefersReducedMotion() || !isAnimatedHeaderSwap(current.shown, target)) {
         apply({ shown: target, outgoing: null, gen: current.gen })
         return
       }
