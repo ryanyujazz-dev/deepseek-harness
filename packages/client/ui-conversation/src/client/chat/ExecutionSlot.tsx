@@ -148,10 +148,13 @@ export const ExecutionSlot = memo(function ExecutionSlot({
   if (form.kind === 'empty') return null
 
   // Single settled member: its own ordinary row, native interactions — the
-  // slot is transparent.
+  // slot is transparent. The SAME header wrapper the live forms use keeps
+  // the row's position in the React tree stable across the running → settled
+  // transition, so the tool row never remounts (its internal expansion and
+  // effects survive the settle).
   const singleMember = members[0]
   if (form.kind === 'single' && singleMember !== undefined) {
-    return <div className={css.slot}>{renderMember(singleMember.nodeKey)}</div>
+    return <div className={css.slot}><div className={css.header}>{renderMember(singleMember.nodeKey)}</div></div>
   }
 
   if (form.kind === 'aggregate') {
