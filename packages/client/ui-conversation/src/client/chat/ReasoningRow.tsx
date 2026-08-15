@@ -1,5 +1,6 @@
 /** Assistant reasoning disclosure, independent of Tool-call presentation. */
-import { IconThinkOutline14, ExecDisclosureRow } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { ExecDisclosureRow } from './ExecDisclosureRow.tsx'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
