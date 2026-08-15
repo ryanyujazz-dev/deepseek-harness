@@ -185,11 +185,11 @@ describe('FileMutationRow diff card', () => {
     expect(view.getByText('复制')).toBeTruthy()
   })
 
-  it('the summary is a path link that opens the tool path through the host', () => {
+  it('the summary is a file-name link that opens the tool path through the host', () => {
     const openFile = vi.fn()
     const view = render(<FileMutationRow {...{ ...rowProps(settled()), openFile }} />)
-    // The path link rides the collapsed summary, so it opens without expanding.
-    fireEvent.click(view.getByRole('button', { name: 'notes/demo.txt' }))
+    // The name link rides the collapsed summary, so it opens without expanding.
+    fireEvent.click(view.getByRole('button', { name: 'demo.txt' }))
     // The row passes the tool's own path; the injected openFile resolves it
     // against the session cwd (apply.ts), so the row must not resolve twice.
     expect(openFile).toHaveBeenCalledWith('notes/demo.txt')

@@ -100,9 +100,10 @@ describe('tool-call-model', () => {
 
   it('keeps summaries single-line and falls back for opaque args', () => {
     expect(toolRowModel('bash', running({ argsRaw: '{"command":"a\\nb"}' })).summary).toBe('a')
-    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/tmp/x.ts"}' })).summary).toBe('/tmp/x.ts')
-    expect(toolRowModel('write', running({ name: 'write', argsRaw: '{"file_path":"src/x.ts"}' })).summary).toBe('src/x.ts')
-    expect(toolRowModel('edit', running({ name: 'edit', argsRaw: '{"file_path":"src/x.ts"}' })).summary).toBe('src/x.ts')
+    // File titles show the file NAME only; the full path stays in filePath.
+    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/tmp/x.ts"}' })).summary).toBe('x.ts')
+    expect(toolRowModel('write', running({ name: 'write', argsRaw: '{"file_path":"src/x.ts"}' })).summary).toBe('x.ts')
+    expect(toolRowModel('edit', running({ name: 'edit', argsRaw: '{"file_path":"src/x.ts"}' })).summary).toBe('x.ts')
     // Other rows prefix the real tool name into the summary slot (figma
     // flows: static "Tool call" title, the name rides the mutable summary).
     expect(toolRowModel('x', running({ argsRaw: '{"n":1}' })).summary).toBe('x · {"n":1}')
@@ -127,14 +128,15 @@ describe('tool-call-model', () => {
     expect(resolveWorkspacePath('/w', 'C:\\x\\a.ts')).toBe('C:\\x\\a.ts')
   })
 
-  it('displays workspace-rooted paths relative to the session cwd', () => {
+  it('displays file titles as the file NAME, whatever the path form', () => {
     const cwd = '/Users/u/ws/'
-    expect(toolRowModel('edit', running({ name: 'edit', argsRaw: '{"file_path":"/Users/u/ws/src/x.ts"}' }), cwd).summary).toBe('src/x.ts')
+    expect(toolRowModel('edit', running({ name: 'edit', argsRaw: '{"file_path":"/Users/u/ws/src/x.ts"}' }), cwd).summary).toBe('x.ts')
     expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/Users/u/ws/a.md"}' }), cwd).summary).toBe('a.md')
-    // Paths outside the workspace (and non-path summaries) stay verbatim.
-    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/etc/hosts"}' }), cwd).summary).toBe('/etc/hosts')
+    // The name rule applies everywhere: outside-workspace and absolute paths
+    // also collapse to the basename; non-file summaries stay verbatim.
+    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/etc/hosts"}' }), cwd).summary).toBe('hosts')
     expect(toolRowModel('bash', running({ argsRaw: '{"command":"pwd"}' }), cwd).summary).toBe('pwd')
-    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/Users/u/ws/a.md"}' }), '').summary).toBe('/Users/u/ws/a.md')
+    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/Users/u/ws/a.md"}' }), '').summary).toBe('a.md')
   })
 
   it('body pretty-prints JSON args, keeps raw non-JSON, null when empty', () => {
@@ -405,7 +407,7 @@ describe('GenericToolCard', () => {
       }))} />,
     )
     expect(view.getByText('Edit')).toBeTruthy()
-    expect(view.getByText('src/x.ts')).toBeTruthy()
+    expect(view.getByText('x.ts')).toBeTruthy()
     expect(view.container.querySelector('[data-variant="edit"]')).not.toBeNull()
     expect(view.container.querySelector('svg')).not.toBeNull()
   })
@@ -418,7 +420,7 @@ describe('GenericToolCard', () => {
       }))} />,
     )
     expect(view.getByText('Write')).toBeTruthy()
-    expect(view.getByText('src/x.ts')).toBeTruthy()
+    expect(view.getByText('x.ts')).toBeTruthy()
     expect(view.container.querySelector('[data-variant="write"]')).not.toBeNull()
     expect(view.container.querySelector('svg')).not.toBeNull()
   })
@@ -434,7 +436,7 @@ describe('GenericToolCard', () => {
   it('file-path summary click reaches openFile; bash summary does not', () => {
     const file = props('read', running({ name: 'read', argsRaw: '{"path":"src/x.ts"}' }))
     const fileView = render(<GenericToolCard {...file} />)
-    fireEvent.click(fileView.getByText('src/x.ts'))
+    fireEvent.click(fileView.getByText('x.ts'))
     expect(file.openFile).toHaveBeenCalledWith('src/x.ts')
 
     const bash = props('bash', result())
