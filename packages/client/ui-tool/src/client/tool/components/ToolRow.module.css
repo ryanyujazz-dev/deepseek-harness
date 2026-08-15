@@ -176,8 +176,8 @@
    no line of layout. */
 .inspectButton {
   position: absolute;
-  top: 13px;
-  right: 38px;
+  top: -22px;
+  right: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;

@@ -20,7 +20,7 @@
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  CodeBlock, DiffBlock, ExecDisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
+  CodeBlock, DiffBlock, ExecDisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, Tooltip, WebBlock,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WebBlockProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -291,15 +291,16 @@ export function ToolRow({
                       </>
                     )}
           {inspect !== undefined && (
-            <button
-              type="button"
-              className={css.inspectButton}
-              title="Inspect"
-              aria-label="Inspect"
-              onClick={inspect}
-            >
-              <IconInspectOutline12 />
-            </button>
+            <Tooltip label="Inspect" side="bottom">
+              <button
+                type="button"
+                className={css.inspectButton}
+                aria-label="Inspect"
+                onClick={inspect}
+              >
+                <IconInspectOutline12 />
+              </button>
+            </Tooltip>
           )}
         </div>
       </ExecDisclosureRow>

@@ -17,7 +17,7 @@ import { useState, type KeyboardEvent } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import clsx from 'clsx'
 import {
-  IconApiOutline14, IconChevronDownOutline14, IconChevronRightOutline14, IconInspectOutline12, StateDot, TerminalBlock,
+  IconApiOutline14, IconChevronDownOutline14, IconChevronRightOutline14, IconInspectOutline12, StateDot, TerminalBlock, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
@@ -155,15 +155,16 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
               </div>
             )}
           {inspect !== undefined && (
-            <button
-              type="button"
-              className={css.inspectButton}
-              title="Inspect"
-              aria-label="Inspect"
-              onClick={inspect}
-            >
-              <IconInspectOutline12 />
-            </button>
+            <Tooltip label="Inspect" side="bottom">
+              <button
+                type="button"
+                className={css.inspectButton}
+                aria-label="Inspect"
+                onClick={inspect}
+              >
+                <IconInspectOutline12 />
+              </button>
+            </Tooltip>
           )}
         </div>
       )}
