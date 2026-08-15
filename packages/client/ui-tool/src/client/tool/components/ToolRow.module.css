@@ -84,6 +84,22 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* ExecFlow: while a call runs (start → done), its row reads at full content
+   color so the in-flight work reads as live text; the settled states
+   (ok/error/stopped) fall back to the muted styles above. */
+.root[data-state='running'] .summary,
+.root[data-state='running'] .summarySuffix,
+.root[data-state='running'] .title {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Running file links keep their clickable affordance at the same content
+   color; the settled link color stays .fileLink's own. */
+.root[data-state='running'] .fileLink {
+  color: var(--dsw-alias-label-primary);
+  text-decoration-color: var(--dsw-alias-label-quaternary);
+}
+
 /* Trailing summary fragment kept out of .summary's ellipsis, for a count whose
    whole value is that it survives a narrow row (the todo row's parallel-active
    `+n`). Repeats .summary's type because it sits beside that text, and its
@@ -145,7 +161,7 @@
   align-self: flex-start;
   align-items: center;
   gap: 4px;
-  margin: 4px 0 2px 4px;
+  margin: 4px 0 2px 22px;
   padding: 2px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 999px;
@@ -186,7 +202,7 @@
 .ioCard {
   display: flex;
   flex-direction: column;
-  margin: 4px 0 4px 4px;
+  margin: 4px 0 4px 22px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 12px;
   background: var(--dsw-alias-markdown-code-block);
@@ -265,14 +281,14 @@
 .readBody,
 .searchBody,
 .webBody {
-  margin: 4px 0 4px 4px;
+  margin: 4px 0 4px 22px;
 }
 
 /* The recovery footer for a capped search: the result text (its `Full … stored
    at …` locator) below the card in the muted tone, since the card holds only the
    retained rows. Same column indent as the card body. */
 .searchRecovery {
-  margin: 4px 0 4px 4px;
+  margin: 4px 0 4px 22px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: var(--dsw-font-xs-13);

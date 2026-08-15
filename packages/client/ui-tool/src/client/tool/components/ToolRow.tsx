@@ -20,7 +20,7 @@
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
+  CodeBlock, DiffBlock, ExecDisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WebBlockProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -194,7 +194,7 @@ export function ToolRow({
   return (
     <div className={css.root} data-variant={variant} data-tool={toolName} data-state={state}>
       {status !== null && <span className={css.visuallyHidden}>{status}</span>}
-      <DisclosureRow
+      <ExecDisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
         titleClassName={css.title}
@@ -301,7 +301,7 @@ export function ToolRow({
             </button>
           )}
         </div>
-      </DisclosureRow>
+      </ExecDisclosureRow>
     </div>
   )
 }

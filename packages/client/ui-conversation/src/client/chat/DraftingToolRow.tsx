@@ -1,0 +1,64 @@
+/**
+ * DraftingToolRow: the pre-call phase of one long-drafting tool, rendered
+ * inside the streaming assistant partial at the tool-call block's position.
+ * The model is still composing the tool's arguments (block-start → the
+ * eventual durable tool/call event), so this row carries the live-text
+ * treatment (content color + the running sweep) and hands its visual slot to
+ * the real tool-call row when the call lands at the same flow position.
+ *
+ * The leading icon matches the settled row the tool later renders (write/edit
+ * take the edit glyph the file-mutation row uses, run_code the code glyph,
+ * todo_write the checklist glyph), so the drafting → running swap changes the
+ * text only. exit_plan_mode has no dedicated settled row (it renders the
+ * generic sparkle), so its drafting glyph is the list-pen: the plan authoring
+ * act, not the generic tool fallback.
+ *
+ * Short-drafting tools (read/bash/search families) deliberately have no
+ * entry: their drafting window is token-level and a row would only flicker.
+ */
+
+import type { ReactNode } from 'react'
+import {
+  IconChecklistOutline14, IconCodeOutline16, IconEditOutline16, IconListPenOutline16,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+import css from './DraftingToolRow.module.css'
+
+/** One drafting mapping: capitalized label + the settled row's glyph. */
+interface DraftingEntry {
+  readonly label: string
+  readonly icon: ReactNode
+}
+
+/** Wire name → drafting presentation; absent name = no drafting row. */
+const DRAFTING: Record<string, DraftingEntry> = {
+  edit: { label: 'Editing', icon: <IconEditOutline16 size={14} /> },
+  write: { label: 'Creating', icon: <IconEditOutline16 size={14} /> },
+  exit_plan_mode: { label: 'Planning', icon: <IconListPenOutline16 size={14} /> },
+  run_code: { label: 'Coding', icon: <IconCodeOutline16 size={14} /> },
+  todo_write: { label: 'Updating todos', icon: <IconChecklistOutline14 /> },
+}
+
+/**
+ * Resolve one tool's drafting presentation.
+ * @param name - wire tool name from the streaming tool-call block.
+ * @returns the entry to show while arguments are being drafted, or undefined
+ * for short-drafting tools that render no row.
+ */
+export function draftingEntry(name: string): DraftingEntry | undefined {
+  return DRAFTING[name]
+}
+
+/** One drafting row: icon + label + sweep, ToolRow geometry. */
+export function DraftingToolRow({ label, icon }: {
+  /** Stable drafting verb phrase (no mid-draft evolution by design). */
+  label: string
+  /** Leading glyph matching the settled row's icon. */
+  icon: ReactNode
+}): React.JSX.Element {
+  return (
+    <div className={css.row}>
+      <span className={css.leading} aria-hidden>{icon}</span>
+      <span className={css.label}>{label}</span>
+    </div>
+  )
+}

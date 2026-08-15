@@ -2,10 +2,13 @@ import { memo, useMemo } from 'react'
 import { JsonBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatNode } from '../contract/chat-nodes.ts'
+import type { ThinkMode } from './ChatView.tsx'
 import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
+  /** Active think display form (compact hides reasoning blocks downstream). */
+  readonly thinkMode?: ThinkMode | undefined
   readonly useSession: ChatViewSlotProps['useSession']
   readonly renderSlot: ChatViewSlotProps['renderSlot']
   readonly t: ChatViewSlotProps['t']
@@ -17,7 +20,7 @@ type RoutedChatNodeOwner = {
 
 /** Subscribe and dispatch one stable Context key without observing sibling Nodes. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, selectedCallId, cwd, openFile, inspectCall, forkAt,
+  nodeKey, thinkMode, selectedCallId, cwd, openFile, inspectCall, forkAt,
   loadImage, fileMentions, useSession, renderSlot, t,
 }: ChatNodeSeatProps) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey))
@@ -32,7 +35,8 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       forkAt,
       loadImage,
       fileMentions,
-    }, [node, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions])
+      thinkMode,
+    }, [node, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions, thinkMode])
   if (routedNode === undefined || owner === null) return null
   // Runtime dispatch owns the correlation: every Node's discriminant is the
   // keyed-slot entry passed alongside that same Node. TypeScript does not

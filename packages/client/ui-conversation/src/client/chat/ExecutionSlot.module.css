@@ -1,0 +1,102 @@
+/* ExecutionSlot: one contiguous tool run rendered as a single morphing slot.
+   Header crossfades between forms (drafting / running / aggregate / single
+   body) at a fixed 24px row height so the flow never shifts. */
+
+.slot {
+  min-width: 0;
+}
+
+.header {
+  position: relative;
+  min-height: 24px;
+}
+
+/* Expanded body: earlier members under the header, stacked at the official
+   chat tab's flow rhythm (the 16px column gap) — including the header-to-
+   first-row distance, so the whole expanded block reads as one column. */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 16px 0 0;
+}
+
+/* Aggregate header row: 24px. While any member still runs the aggregate is
+   not shown (a live member owns the slot), so the aggregate itself reads at
+   the settled muted color by default; the live variant (kept for a run whose
+   members are still settling) keeps content color. */
+.aggregate {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.aggregate:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Live aggregate (a member settled but siblings still running): reads as
+   live text like a running row. */
+.aggregateLive {
+  color: var(--dsw-alias-label-primary);
+}
+
+.aggregateText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aggregateTextLive {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Leading seat: the LAST member's tool icon by default; hover swaps it for
+   the expand chevron (the disclosure affordance appears on intent). Mirrors
+   DisclosureRow's leading box exactly (16px + 6px gap) so header and expanded
+   rows align to the pixel. The icon color pins to label-tertiary — the same
+   resting color as a single tool row's icon — instead of following the
+   header's (brighter) text color. */
+.leading {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.leadingIcon,
+.leadingChevron {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 120ms ease;
+}
+
+.leadingChevron {
+  opacity: 0;
+}
+
+.aggregate:hover .leadingIcon {
+  opacity: 0;
+}
+
+.aggregate:hover .leadingChevron {
+  opacity: 1;
+}
+
+.chevron {
+  color: var(--dsw-alias-label-secondary);
+  flex: none;
+}
