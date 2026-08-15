@@ -168,14 +168,11 @@ export const ExecutionSlot = memo(function ExecutionSlot({
           <span className={css.aggregateText}>{aggregateText(members)}</span>
         </div>
         {expanded && (
-          <>
-            <div className={css.railHead} aria-hidden />
-            <div className={css.body}>
-              {members.map(m => (
-                <div key={m.nodeKey} className={css.member}>{renderMember(m.nodeKey)}</div>
-              ))}
-            </div>
-          </>
+          <div className={css.body}>
+            {members.map(m => (
+              <div key={m.nodeKey}>{renderMember(m.nodeKey)}</div>
+            ))}
+          </div>
         )}
       </div>
     )

@@ -109,28 +109,3 @@
   color: var(--dsw-alias-label-secondary);
   flex: none;
 }
-
-.railHead {
-  position: absolute;
-  top: 12px;
-  left: 7.5px;
-  width: 1px;
-  height: 12px;
-  background: var(--dsw-alias-border-l2);
-  pointer-events: none;
-}
-
-.member {
-  position: relative;
-}
-
-.member::before {
-  content: '';
-  position: absolute;
-  top: -16px;
-  left: 7.5px;
-  width: 1px;
-  height: 28px;
-  background: var(--dsw-alias-border-l2);
-  pointer-events: none;
-}
