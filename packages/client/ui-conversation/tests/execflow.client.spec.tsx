@@ -334,7 +334,10 @@ describe('ExecFlow partition and slot forms', () => {
     })
     const aggregate = container.querySelector('[class*="aggregate"][role="button"]')
     expect(aggregate).not.toBeNull()
-    expect(aggregate?.textContent).toContain('运行 2 条命令')
+    // The expanded summary counts SETTLED members only: while call-2 keeps
+    // executing the title holds steady at one command; both members (the
+    // live one last) render in the body regardless.
+    expect(aggregate?.textContent).toContain('运行 1 条命令')
     const body = container.querySelector('[class*="body"]')
     expect(body?.querySelectorAll('[data-chat-flow-kind="tool-call"]')).toHaveLength(2)
 
@@ -343,6 +346,54 @@ describe('ExecFlow partition and slot forms', () => {
     await waitFor(() => {
       expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
     })
+  })
+
+  it('a tool finishing under the expanded summary replays the title slide', async () => {
+    // call-1 settled, call-2 running; expand, then settle call-2 — the title
+    // slides 运行 1 条命令 → 运行 2 条命令 instead of swapping in place.
+    const h = makeHarness({
+      nodes: [user(1, 'go'), toolResult(2, 'call-1')],
+      runningCalls: [{ ...runningCall('call-2'), turn: 1 }],
+    })
+    const { container } = render(<h.ChatView {...h.props} />)
+    fireEvent.click(container.querySelector('[class*="header"][role="button"]')!)
+    await waitFor(() => {
+      expect(container.querySelector('[class*="layerOutWindow"]')).toBeNull()
+    })
+    expect(container.querySelector('[class*="aggregate"][role="button"]')?.textContent).toContain('运行 1 条命令')
+
+    // call-2 settles (turn stays open so the order identity also changes).
+    act(() => {
+      h.set({
+        nodes: [
+          user(1, 'go'),
+          toolResult(2, 'call-1'),
+          { ...toolResult(3, 'call-2'), turn: 1 } as never,
+        ],
+        runningCalls: [],
+        // turnEnds appends the turn-tail so the fixture's order identity
+        // changes (the settled key sequence alone is unchanged — the phased
+        // source needs a fresh identity to re-render).
+        turnEnds: new Map([[1, 4]]),
+      })
+    })
+    // The beat: the exiting layer carries the OLD title, the entering layer
+    // the new one; after the slide only the new title remains. The head query
+    // scopes to the INCOMING layer — the outgoing layer also renders an
+    // aggregate div (with the OLD title), and DOM order would match it first.
+    await waitFor(() => {
+      const out = container.querySelector('[class*="layerOutWindow"] [class*="aggregateText"]')
+      const head = container.querySelector('[class*="layerInWindow"] [class*="aggregate"][role="button"]')
+      if (out === null || head === null) {
+        throw new Error(`DEBUG out=${out === null ? 'MISSING' : out.textContent} head=${head === null ? 'MISSING' : head.textContent?.slice(0, 40)} layers=${container.querySelectorAll('[class*="layerOutWindow"]').length} text=${container.textContent?.slice(0, 120)}`)
+      }
+      expect(out.textContent).toContain('运行 1 条命令')
+      expect(head.textContent).toContain('运行 2 条命令')
+    })
+    await waitFor(() => {
+      expect(container.querySelector('[class*="layerOutWindow"]')).toBeNull()
+    })
+    expect(container.querySelector('[class*="aggregate"][role="button"]')?.textContent).toContain('运行 2 条命令')
   })
 
   it('a later parallel tool finishing returns the header to the still-running earlier one', async () => {

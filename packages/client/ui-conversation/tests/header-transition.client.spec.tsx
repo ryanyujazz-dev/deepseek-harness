@@ -21,14 +21,14 @@ const drafting = (name: string, index: number) =>
   ({ kind: 'drafting' as const, drafting: { name, index } })
 const running = (nodeKey: string, toolName = 'read') =>
   ({ kind: 'running' as const, member: { nodeKey, toolName, running: true } })
-const aggregate = { kind: 'aggregate' as const }
+const aggregate = (rev = 2) => ({ kind: 'aggregate' as const, rev })
 const single = { kind: 'single' as const }
 const empty = { kind: 'empty' as const }
 
 describe('swap classification', () => {
   it('animates only aggregate returns and live displacements', () => {
-    expect(isAnimatedHeaderSwap(running('a'), aggregate)).toBe(true)
-    expect(isAnimatedHeaderSwap(drafting('edit', 0), aggregate)).toBe(true)
+    expect(isAnimatedHeaderSwap(running('a'), aggregate())).toBe(true)
+    expect(isAnimatedHeaderSwap(drafting('edit', 0), aggregate())).toBe(true)
     expect(isAnimatedHeaderSwap(running('a'), drafting('edit', 0))).toBe(true)
     expect(isAnimatedHeaderSwap(drafting('edit', 0), drafting('write', 1))).toBe(true)
     expect(isAnimatedHeaderSwap(running('a'), running('b'))).toBe(true)
@@ -36,7 +36,7 @@ describe('swap classification', () => {
 
   it('keeps lifecycle continuations and batch starts instant', () => {
     expect(isAnimatedHeaderSwap(drafting('edit', 0), running('k1', 'edit'))).toBe(false)
-    expect(isAnimatedHeaderSwap(aggregate, drafting('edit', 0))).toBe(false)
+    expect(isAnimatedHeaderSwap(aggregate(), drafting('edit', 0))).toBe(false)
     expect(isAnimatedHeaderSwap(empty, running('a'))).toBe(false)
     expect(isAnimatedHeaderSwap(running('a'), empty)).toBe(false)
     expect(isAnimatedHeaderSwap(single, running('b'))).toBe(false)
@@ -48,7 +48,7 @@ describe('swap classification', () => {
     expect(sameHeaderForm(drafting('edit', 0), drafting('edit', 1))).toBe(false)
     expect(sameHeaderForm(running('k1'), running('k1'))).toBe(true)
     expect(sameHeaderForm(running('k1'), running('k2'))).toBe(false)
-    expect(sameHeaderForm(aggregate, aggregate)).toBe(true)
+    expect(sameHeaderForm(aggregate(), aggregate())).toBe(true)
   })
 })
 
@@ -77,7 +77,7 @@ describe('useHeaderTransition', () => {
 
   it('settling to the aggregate plays one slide and settles', () => {
     const h = setup(running('a'))
-    h.set(aggregate)
+    h.set(aggregate())
     expect(h.result.current).toMatchObject({ outgoing: { kind: 'running' }, shown: { kind: 'aggregate' } })
     h.advance()
     expect(h.result.current).toMatchObject({ shown: { kind: 'aggregate' }, outgoing: null })
@@ -102,7 +102,7 @@ describe('useHeaderTransition', () => {
   it('retargets a queued running form to the aggregate when reality settles first', () => {
     const h = setup(running('a'))
     h.set(running('b')) // anim: a → b
-    h.set(aggregate)    // everything settled before the slide airs
+    h.set(aggregate())    // everything settled before the slide airs
     h.advance()
     // The entering layer (b) finished its slide, so the viewer sees b; the
     // queue then plays b → aggregate. b IS what the viewer currently sees —
@@ -115,7 +115,7 @@ describe('useHeaderTransition', () => {
   it('never shows a stale running form after the aggregate target arrives', () => {
     const h = setup(running('a'))
     h.set(running('b'))
-    h.set(aggregate)
+    h.set(aggregate())
     h.advance()
     h.advance()
     const kinds: string[] = []
@@ -125,6 +125,14 @@ describe('useHeaderTransition', () => {
     expect(kinds).toEqual(['aggregate'])
   })
 
+  it('a settle under the on-screen summary animates the title (revision beat)', () => {
+    const h = setup(aggregate(2))
+    h.set(aggregate(3))
+    expect(h.result.current).toMatchObject({ shown: { kind: 'aggregate', rev: 3 }, outgoing: { kind: 'aggregate', rev: 2 } })
+    h.advance()
+    expect(h.result.current).toMatchObject({ shown: { kind: 'aggregate', rev: 3 }, outgoing: null })
+  })
+
   it('drafting → same-tool running swaps instantly', () => {
     const h = setup(drafting('edit', 0))
     h.set(running('k1', 'edit'))
@@ -132,7 +140,7 @@ describe('useHeaderTransition', () => {
   })
 
   it('aggregate → next drafting swaps instantly', () => {
-    const h = setup(aggregate)
+    const h = setup(aggregate())
     h.set(drafting('edit', 0))
     expect(h.result.current).toMatchObject({ shown: { kind: 'drafting' }, outgoing: null })
   })
@@ -140,7 +148,7 @@ describe('useHeaderTransition', () => {
   it('honors prefers-reduced-motion with instant swaps', () => {
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
     const h = setup(running('a'))
-    h.set(aggregate)
+    h.set(aggregate())
     expect(h.result.current).toMatchObject({ shown: { kind: 'aggregate' }, outgoing: null })
   })
 })

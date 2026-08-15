@@ -111,7 +111,7 @@ function headerForm(members: readonly SlotMember[], drafting: readonly SlotDraft
   const running = members.filter(m => m.running)
   const latestRunning = running[running.length - 1]
   if (latestRunning !== undefined) return { kind: 'running', member: latestRunning }
-  if (members.length >= 2) return { kind: 'aggregate' }
+  if (members.length >= 2) return { kind: 'aggregate', rev: members.length }
   if (members.length === 1) return { kind: 'single' }
   return { kind: 'empty' }
 }
@@ -145,10 +145,15 @@ export const ExecutionSlot = memo(function ExecutionSlot({
   // header shows the aggregate summary title (never the live member); only
   // collapsed does a running/drafting member take the header. The transition
   // machine consumes this display form, so expanding plays the running →
-  // aggregate slide (the completion beat) and collapsing is instant.
+  // aggregate slide (the completion beat) and collapsing is instant. The
+  // summary counts SETTLED members and keys its revision on that count:
+  // while tools keep executing the title holds steady, and one finishing
+  // mid-run changes the revision — the controller answers with the same
+  // slide beat instead of swapping the text in place.
+  const settledCount = members.reduce((count, m) => (m.running ? count : count + 1), 0)
   const displayForm: HeaderForm = expanded && expandable && members.length >= 2
     && (form.kind === 'running' || form.kind === 'drafting')
-    ? { kind: 'aggregate' }
+    ? { kind: 'aggregate', rev: settledCount }
     : form
   const { shown, outgoing, gen } = useHeaderTransition(displayForm)
 
@@ -267,7 +272,7 @@ export const ExecutionSlot = memo(function ExecutionSlot({
           {bodyKeys.map(key => <div key={key}>{renderMember(key)}</div>)}
           {earlierDrafting.map((d) => {
             const e = draftingEntry(d.name)
-            return e === undefined ? null : <DraftingToolRow key={`draft:${d.index}`} label={t(e.key)} icon={e.icon} />
+            return e === undefined ? null : <DraftingToolRow key={`draft:${d.index}`} label={t(e.key)} icon={e.icon} target={d.target} />
           })}
         </div>
       )}
