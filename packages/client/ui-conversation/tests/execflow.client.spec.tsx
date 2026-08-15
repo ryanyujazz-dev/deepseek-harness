@@ -171,8 +171,11 @@ describe('ExecFlow partition and slot forms', () => {
     const aggregate = container.querySelector('[class*="aggregate"][role="button"]')
     expect(aggregate).not.toBeNull()
     expect(aggregate?.textContent).toContain('运行 3 条命令')
-    // The three member rows are NOT individually rendered while collapsed.
-    expect(container.querySelectorAll('[data-testid="tool-seat"]')).toHaveLength(0)
+    // Collapsed: NO member renders its own flow row (the aggregate header
+    // is the run's only surface; members appear solely in the expanded
+    // body). Three sibling rows would mean the partition failed to group.
+    const toolFlowRows = [...container.querySelectorAll('[data-chat-flow-kind="tool-call"]')]
+    expect(toolFlowRows).toHaveLength(0)
   })
 
   it('a single tool run renders the tool row itself (no aggregate)', () => {
@@ -276,11 +279,11 @@ describe('ExecFlow partition and slot forms', () => {
       runningCalls: [runningCall('call-2')],
     })
     const { container } = render(<h.ChatView {...h.props} />)
-    // The running call heads the slot (rendered through the node seat's
-    // fallback: the fixture renderSlot renders the fallback for chat nodes,
-    // and the running tool node flows through the partition).
+    // No aggregate while a member runs, and the RUNNING member heads the
+    // slot: it renders through the seat's JsonBlock fallback (the harness
+    // has no Tool presentation plugin), so its node kind reaches the DOM.
     expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
-    expect(container.textContent).not.toContain('运行')
+    expect(container.textContent).toContain('未知 surface 事件：tool-call')
   })
 })
 

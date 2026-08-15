@@ -142,20 +142,42 @@
    slides. The keyframes mirror the prototype rhythm: the old layer is fully
    gone by 70% of the timeline; the new layer holds below until 30% then
    springs in. Duration matches HEADER_ANIM_MS in header-transition.ts. */
+/* The stage never clips, and a resting layer does not either: affordances
+   that protrude above the header row (the tool row's hover Inspect at
+   top:-22px) must stay visible in every form. While a swap plays, each
+   layer is a WINDOW (overflow:hidden outer) around MOVING content (the
+   animated inner) — a layer's own transform is not clipped by its own
+   overflow, so the window and the slide must be two nested elements. The
+   window classes apply only mid-animation; at rest the layers are plain. */
 .stage {
   position: relative;
+}
+
+.layerOutWindow {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .layerOut {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
   animation: dsh-execflow-hdr-out 500ms cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+
+.layerInWindow {
+  overflow: hidden;
 }
 
 .layerIn {
   animation: dsh-execflow-hdr-in 500ms cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+
+/* Member rows fill the header's width instead of shrink-wrapping to their
+   content (a short tool row would otherwise read as a narrow strip and the
+   sweep/Inspect geometry would shift). The handle keeps its natural size. */
+.header > :not(.handle) {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 @keyframes dsh-execflow-hdr-out {

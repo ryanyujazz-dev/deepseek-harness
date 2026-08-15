@@ -382,8 +382,8 @@ export const en = {
   'clock.ymd': '{y}-{m}-{d}',
 
   // ── ExecFlow execution view ──────────────────────────────────────────────
-  'execflow.slot.toggle': '展开或收起本次运行的其他工具（当前：{name}）',
-  'execflow.slot.toggleDrafting': '展开或收起本次运行的其他工具（正在起草：{label}）',
+  'execflow.slot.toggle': 'Expand or collapse other tools of this run (current: {name})',
+  'execflow.slot.toggleDrafting': 'Expand or collapse other tools of this run (drafting: {label})',
   'execflow.think.more': 'Show more',
   'execflow.think.less': 'Show less',
   'execflow.menu.display': 'Display mode',

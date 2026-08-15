@@ -209,15 +209,15 @@ export const ExecutionSlot = memo(function ExecutionSlot({
         {outgoing !== null && (
           <div
             key={`out-${gen}`}
-            className={css.layerOut}
+            className={css.layerOutWindow}
             aria-hidden
             {...({ inert: '' } as Record<string, string>)}
           >
-            {renderHeaderContent(outgoing)}
+            <div className={css.layerOut}>{renderHeaderContent(outgoing)}</div>
           </div>
         )}
-        <div key={`in-${gen}`} className={outgoing !== null ? css.layerIn : undefined}>
-          {renderHeaderContent(shown)}
+        <div key={`in-${gen}`} className={outgoing !== null ? css.layerInWindow : undefined}>
+          <div className={outgoing !== null ? css.layerIn : undefined}>{renderHeaderContent(shown)}</div>
         </div>
       </div>
       {expanded && expandable && (

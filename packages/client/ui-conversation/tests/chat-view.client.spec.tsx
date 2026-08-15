@@ -913,7 +913,7 @@ describe('ChatView', () => {
 
     act(() => {
       h.set({
-        nodes: [user(1, 'q'), toolResult(3, 'r1'), assistant(4, 'later')],
+        nodes: [user(1, 'q'), { ...toolResult(3, 'r1'), turn: 2 } as never, assistant(4, 'later')],
         runningCalls: [],
         running: false,
       })

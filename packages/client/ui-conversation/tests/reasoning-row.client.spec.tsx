@@ -50,6 +50,30 @@ describe('ReasoningRow clamp', () => {
     expect(wrap?.hasAttribute('data-clamped')).toBe(true)
   })
 
+  it('streams the LATEST line while running and the FIRST line after settling', () => {
+    const runningView = render(<ReasoningRow text={'line one\nline two\nline three'} running defaultExpanded={false} t={t} />)
+    const runningSummary = runningView.container.querySelector('[class*="summary"]')
+    expect(runningSummary?.textContent).toBe('line three')
+    const settledView = render(<ReasoningRow text={'line one\nline two\nline three'} running={false} defaultExpanded={false} t={t} />)
+    const settledSummary = settledView.container.querySelector('[class*="summary"]')
+    expect(settledSummary?.textContent).toBe('line one')
+  })
+
+  it('expands from the row click and folds back', () => {
+    const view = render(<ReasoningRow text={longText} running={false} defaultExpanded={false} t={t} />)
+    expect(view.container.querySelector('[class*="thinkBody"]')).toBeNull()
+    fireEvent.click(view.getByRole('button'))
+    expect(view.container.querySelector('[class*="thinkBody"]')).not.toBeNull()
+    fireEvent.click(view.getByRole('button'))
+    expect(view.container.querySelector('[class*="thinkBody"]')).toBeNull()
+  })
+
+  it('renders no IN card — the row is a disclosure, not a terminal', () => {
+    const view = render(<ReasoningRow text={longText} running={false} defaultExpanded t={t} />)
+    expect(view.container.querySelector('[class*="ioCard"]')).toBeNull()
+    expect(view.container.querySelector('[class*="terminal"]')).toBeNull()
+  })
+
   it('keeps the collapsed summary line when not expanded', () => {
     const r = render(<ReasoningRow text={longText} running={false} defaultExpanded={false} t={t} />)
     // Collapsed: the summary shows the first line, no body.

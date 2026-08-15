@@ -251,7 +251,7 @@ export function ChatView({
   const flow = useMemo(() => {
     type Entry =
       | { kind: 'node'; nodeKey: string }
-      | { kind: 'run'; members: SlotMember[]; stepStart: number | null; stepEnd: number | null }
+      | { kind: 'run'; turn: number | null; members: SlotMember[]; stepStart: number | null; stepEnd: number | null }
     const entries: Entry[] = []
     const toolNameOf = (nodeKey: string): string | undefined => {
       const node = nodeStore.get(nodeKey)
@@ -312,6 +312,7 @@ export function ChatView({
         const stepLocation = location?.kind === 'step' ? location.step : undefined
         entries.push({
           kind: 'run',
+          turn,
           members: [{ nodeKey, toolName: name, running: runningOf(nodeKey) }],
           stepStart: stepLocation?.start?.time ?? null,
           stepEnd: stepLocation?.end?.time ?? null,
@@ -343,7 +344,7 @@ export function ChatView({
         // No run yet for the streaming step (the last entry is a plain node or
         // the flow is empty): create a pending (empty) run that renders the
         // drafting header at the flow tail.
-        entries.push({ kind: 'run', members: [], stepStart: null, stepEnd: null })
+        entries.push({ kind: 'run', turn: draftingTurn, members: [], stepStart: null, stepEnd: null })
         draftingForLastRun = true
       }
     }
@@ -605,7 +606,7 @@ export function ChatView({
                  pending drafting run keys on the partial's turn — the run it
                  BECOMES — so landing the first member keeps the identity (no
                  remount, expansion survives). */
-              key={`run:${entry.members[0]?.nodeKey ?? `pending:${partial?.turn ?? 'tail'}`}`}
+              key={`run:t-${entry.turn ?? 'root'}`}
               members={entry.members}
               /* The partial's drafting blocks belong to ONE run — the LAST
                  entry (the partition either matched the partial's turn on
