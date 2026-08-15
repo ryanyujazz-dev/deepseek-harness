@@ -6,7 +6,7 @@
 // ObservableSnapshot fake as chat-view.client.spec.tsx.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import type {
   ConversationSnapshot, RunningToolCall, SessionId, SessionListState,
   ToolResultNode, WorkspaceListState,
@@ -268,6 +268,39 @@ describe('ExecFlow partition and slot forms', () => {
     })
     const r2 = render(<h2.ChatView {...h2.props} />)
     expect(r2.container.textContent).not.toContain('Reading')
+  })
+
+  it('an expanded aggregate header shows the summary title, not the live member', async () => {
+    // One run: call-1 settled, call-2 running (same turn — the runningCall
+    // fixture defaults to turn 2, so override it to join the run).
+    const h = makeHarness({
+      nodes: [user(1, 'go'), toolResult(2, 'call-1')],
+      runningCalls: [{ ...runningCall('call-2'), turn: 1 }],
+    })
+    const { container } = render(<h.ChatView {...h.props} />)
+    // Collapsed: the live member heads the slot — no aggregate.
+    expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
+
+    // Expand via the header: the header becomes the aggregate summary; both
+    // members render in the body (the live one reads last). The expand plays
+    // the running → aggregate slide, so wait for it to settle (the exiting
+    // layer is the sentinel) before collapsing — a mid-slide collapse defers
+    // through the coalesce queue by design.
+    fireEvent.click(container.querySelector('[class*="header"][role="button"]')!)
+    await waitFor(() => {
+      expect(container.querySelector('[class*="layerOutWindow"]')).toBeNull()
+    })
+    const aggregate = container.querySelector('[class*="aggregate"][role="button"]')
+    expect(aggregate).not.toBeNull()
+    expect(aggregate?.textContent).toContain('运行 2 条命令')
+    const body = container.querySelector('[class*="body"]')
+    expect(body?.querySelectorAll('[data-chat-flow-kind="tool-call"]')).toHaveLength(2)
+
+    // Collapse again: the live member heads the slot once more.
+    fireEvent.click(aggregate!)
+    await waitFor(() => {
+      expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
+    })
   })
 
   it('a later parallel tool finishing returns the header to the still-running earlier one', async () => {

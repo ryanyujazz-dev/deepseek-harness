@@ -10,7 +10,7 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   IconApiOutline14, IconBrowseOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconCodeOutline16,
-  IconEditOutline16, IconSearchOutline16, IconSparkle16,
+  IconEditOutline16, IconSearchOutline16, IconSkillOutline16, IconSparkle16, IconStopFill16, IconTrashOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 
@@ -46,7 +46,10 @@ function toolIcon(name: string): ReactNode {
     case 'web_search': case 'grep': case 'glob': case 'session_search': case 'session_event_search':
       return <IconSearchOutline16 size={14} />
     case 'write': case 'edit': return <IconEditOutline16 size={14} />
-    case 'run_code': return <IconCodeOutline16 size={14} />
+    case 'run_code': case 'cordis_define': case 'cordis_run': return <IconCodeOutline16 size={14} />
+    case 'skill': return <IconSkillOutline16 size={14} />
+    case 'cordis_stop': return <IconStopFill16 size={14} />
+    case 'cordis_undefine': return <IconTrashOutline16 size={14} />
     default: return <IconSparkle16 size={14} />
   }
 }
@@ -116,7 +119,6 @@ export const ExecutionSlot = memo(function ExecutionSlot({
   members, drafting, renderMember, t,
 }: ExecutionSlotProps) {
   const form = headerForm(members, drafting)
-  const { shown, outgoing, gen } = useHeaderTransition(form)
   const [expanded, setExpanded] = useState(false)
 
   // The aggregate body is EVERY member in every multi-member form: a running
@@ -136,6 +138,17 @@ export const ExecutionSlot = memo(function ExecutionSlot({
   const expandable = form.kind === 'aggregate'
     || (form.kind === 'running' && members.length >= 2)
     || (form.kind === 'drafting' && (members.length >= 1 || earlierDrafting.length > 0))
+
+  // The DISPLAY form is expanded-aware: while the aggregate body is open, the
+  // header shows the aggregate summary title (never the live member); only
+  // collapsed does a running/drafting member take the header. The transition
+  // machine consumes this display form, so expanding plays the running →
+  // aggregate slide (the completion beat) and collapsing is instant.
+  const displayForm: HeaderForm = expanded && expandable && members.length >= 2
+    && (form.kind === 'running' || form.kind === 'drafting')
+    ? { kind: 'aggregate' }
+    : form
+  const { shown, outgoing, gen } = useHeaderTransition(displayForm)
 
   // Keep expansion through header swaps (new member replaces the header, the
   // displaced one joins the body); only an empty slot resets.
