@@ -17,6 +17,7 @@ import type { ChatViewSlotProps } from '../contract/slots.ts'
 type Translate = ChatViewSlotProps['t']
 type ConversationKey = Parameters<Translate>[0]
 import { draftingEntry } from './DraftingToolRow.tsx'
+import { useHeaderTransition, type HeaderForm } from './header-transition.ts'
 import { DraftingToolRow } from './DraftingToolRow.tsx'
 import css from './ExecutionSlot.module.css'
 
@@ -35,14 +36,6 @@ export interface SlotDrafting {
   /** Block index in the partial, for chronological order. */
   readonly index: number
 }
-
-/** What the header currently is. */
-type HeaderForm =
-  | { kind: 'drafting'; drafting: SlotDrafting }
-  | { kind: 'running'; member: SlotMember }
-  | { kind: 'aggregate' }
-  | { kind: 'single' }
-  | { kind: 'empty' }
 
 /** Variant leading glyph for a wire tool name (mirrors GenericToolCard's table). */
 function toolIcon(name: string): ReactNode {
@@ -123,6 +116,7 @@ export const ExecutionSlot = memo(function ExecutionSlot({
   members, drafting, renderMember, t,
 }: ExecutionSlotProps) {
   const form = headerForm(members, drafting)
+  const { shown, outgoing, gen } = useHeaderTransition(form)
   const [expanded, setExpanded] = useState(false)
 
   // Members other than a running header are the expand body; the aggregate's
@@ -147,22 +141,13 @@ export const ExecutionSlot = memo(function ExecutionSlot({
 
   if (form.kind === 'empty') return null
 
-  // Single settled member: its own ordinary row, native interactions — the
-  // slot is transparent. The SAME header wrapper the live forms use keeps
-  // the row's position in the React tree stable across the running → settled
-  // transition, so the tool row never remounts (its internal expansion and
-  // effects survive the settle).
-  const singleMember = members[0]
-  if (form.kind === 'single' && singleMember !== undefined) {
-    return <div className={css.slot}><div className={css.header}>{renderMember(singleMember.nodeKey)}</div></div>
-  }
-
-  if (form.kind === 'aggregate') {
-    // The aggregate shows only when no member is live (a live member owns the
-    // slot), so it always reads at the settled muted color.
-    const lastMember = members[members.length - 1]
-    return (
-      <div className={css.slot}>
+  /** One form's header chrome (the stage layers render this for shown/outgoing). */
+  const renderHeaderContent = (f: HeaderForm): ReactNode => {
+    // The aggregate shows only when no member is live (a live member owns
+    // the slot), so it always reads at the settled muted color.
+    if (f.kind === 'aggregate') {
+      const lastMember = members[members.length - 1]
+      return (
         <div
           className={css.aggregate}
           role="button"
@@ -179,32 +164,30 @@ export const ExecutionSlot = memo(function ExecutionSlot({
           </span>
           <span className={css.aggregateText}>{aggregateText(members, t)}</span>
         </div>
-        {expanded && (
-          <div className={css.body}>
-            {members.map(m => (
-              <div key={m.nodeKey}>{renderMember(m.nodeKey)}</div>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // Live header (drafting or running). The member's own row renders as the
-  // header content and KEEPS its native interactions (click expands the row's
-  // own disclosure) — the slot's expand rides a separate leading handle, so
-  // one click can never toggle both and no interactive control nests another.
-  const entry = form.kind === 'drafting' ? draftingEntry(form.drafting.name) : undefined
-  return (
-    <div className={css.slot}>
+      )
+    }
+    // Single settled member: its own ordinary row, native interactions
+    // through the SAME header wrapper the live forms use, so the row's
+    // position in the React tree stays stable across the running to settled
+    // transition (an instant-swap class) and never remounts.
+    if (f.kind === 'single') {
+      const singleMember = members[0]
+      return <div className={css.header}>{singleMember === undefined ? null : renderMember(singleMember.nodeKey)}</div>
+    }
+    // Live header (drafting or running). The member's own row renders as the
+    // header content and KEEPS its native interactions (click expands the
+    // row's own disclosure); the slot's expand rides a separate handle, so
+    // one click can never toggle both and no control nests another.
+    const entry = f.kind === 'drafting' ? draftingEntry(f.drafting.name) : undefined
+    return (
       <div className={css.header}>
         {expandable && (
           <button
             type="button"
             className={css.handle}
             aria-expanded={expanded}
-            aria-label={form.kind === 'running'
-              ? t('execflow.slot.toggle', { name: form.member.toolName })
+            aria-label={f.kind === 'running'
+              ? t('execflow.slot.toggle', { name: f.member.toolName })
               : t('execflow.slot.toggleDrafting', { label: entry === undefined ? '' : t(entry.key) })}
             onClick={() => { setExpanded(v => !v) }}
           >
@@ -213,9 +196,29 @@ export const ExecutionSlot = memo(function ExecutionSlot({
               : <IconChevronRightOutline14 />}
           </button>
         )}
-        {form.kind === 'drafting' && entry !== undefined
+        {f.kind === 'drafting' && entry !== undefined
           ? <DraftingToolRow label={t(entry.key)} icon={entry.icon} />
-          : form.kind === 'running' ? renderMember(form.member.nodeKey) : null}
+          : f.kind === 'running' ? renderMember(f.member.nodeKey) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className={css.slot}>
+      <div className={css.stage}>
+        {outgoing !== null && (
+          <div
+            key={`out-${gen}`}
+            className={css.layerOut}
+            aria-hidden
+            {...({ inert: '' } as Record<string, string>)}
+          >
+            {renderHeaderContent(outgoing)}
+          </div>
+        )}
+        <div key={`in-${gen}`} className={outgoing !== null ? css.layerIn : undefined}>
+          {renderHeaderContent(shown)}
+        </div>
       </div>
       {expanded && expandable && (
         <div className={css.body}>

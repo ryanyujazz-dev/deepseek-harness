@@ -135,3 +135,44 @@
   color: var(--dsw-alias-label-secondary);
   flex: none;
 }
+/* ── Header swap animation (prototype: slide-up-fade-out / slide-down-fade-in)
+   The stage is the layered swap surface: the incoming layer stays in flow
+   (it sizes the stage — including tall single-form content); the outgoing
+   layer overlays it absolutely and is clipped by the stage box while it
+   slides. The keyframes mirror the prototype rhythm: the old layer is fully
+   gone by 70% of the timeline; the new layer holds below until 30% then
+   springs in. Duration matches HEADER_ANIM_MS in header-transition.ts. */
+.stage {
+  position: relative;
+  overflow: hidden;
+}
+
+.layerOut {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: dsh-execflow-hdr-out 500ms cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+
+.layerIn {
+  animation: dsh-execflow-hdr-in 500ms cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+
+@keyframes dsh-execflow-hdr-out {
+  0%   { transform: translateY(0);     opacity: 1; }
+  70%  { transform: translateY(-24%);  opacity: 0; }
+  100% { transform: translateY(-40%);  opacity: 0; }
+}
+
+@keyframes dsh-execflow-hdr-in {
+  0%   { transform: translateY(40%);   opacity: 0; }
+  30%  { transform: translateY(40%);   opacity: 0; }
+  100% { transform: translateY(0);     opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layerOut,
+  .layerIn {
+    animation-duration: 1ms;
+  }
+}
