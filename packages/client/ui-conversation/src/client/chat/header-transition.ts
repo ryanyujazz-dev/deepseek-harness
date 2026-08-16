@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Queue+coalesce controller for the ExecutionSlot header swap animation.
  *
  * Which swaps animate (slide-up-fade-out / slide-down-fade-in, the prototype
@@ -18,11 +18,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SlotDrafting, SlotMember } from './ExecutionSlot.tsx'
 
-/** What the slot's header currently is. */
+/** What the slot's header currently is. The aggregate form carries a content
+ * revision (the settled-member count it summarizes): the form KIND alone
+ * cannot express "one more tool finished" — without the revision, a settle
+ * while the summary is on screen swaps the title text with no beat. */
 export type HeaderForm =
   | { kind: 'drafting'; drafting: SlotDrafting }
   | { kind: 'running'; member: SlotMember }
-  | { kind: 'aggregate' }
+  | { kind: 'aggregate'; rev: number }
   | { kind: 'single' }
   | { kind: 'empty' }
 
@@ -39,7 +42,8 @@ export interface HeaderLayerState {
   readonly gen: number
 }
 
-/** Value identity: drafting by (name, block index), running by node key, kinds otherwise. */
+/** Value identity: drafting by (name, block index), running by node key,
+ * aggregate by content revision, kinds otherwise. */
 export function sameHeaderForm(a: HeaderForm, b: HeaderForm): boolean {
   if (a.kind !== b.kind) return false
   if (a.kind === 'drafting' && b.kind === 'drafting') {
@@ -48,6 +52,9 @@ export function sameHeaderForm(a: HeaderForm, b: HeaderForm): boolean {
   if (a.kind === 'running' && b.kind === 'running') {
     return a.member.nodeKey === b.member.nodeKey
   }
+  if (a.kind === 'aggregate' && b.kind === 'aggregate') {
+    return a.rev === b.rev
+  }
   return true
 }
 
@@ -55,8 +62,13 @@ export function sameHeaderForm(a: HeaderForm, b: HeaderForm): boolean {
 export function isAnimatedHeaderSwap(prev: HeaderForm, next: HeaderForm): boolean {
   if (prev.kind === 'empty' || next.kind === 'empty') return false
   if (prev.kind === 'single' || next.kind === 'single') return false
-  // Settling back to the aggregate is the completion beat; leaving it is instant.
-  if (next.kind === 'aggregate') return prev.kind === 'drafting' || prev.kind === 'running'
+  // Settling back to the aggregate is the completion beat, and so is one more
+  // tool finishing while the summary is already on screen (the revision
+  // changed — the title counts a new member); leaving the aggregate is instant.
+  if (next.kind === 'aggregate') {
+    return prev.kind === 'drafting' || prev.kind === 'running'
+      || (prev.kind === 'aggregate' && prev.rev !== next.rev)
+  }
   if (prev.kind === 'aggregate') return false
   // A drafting block landing as its own running row is the same tool continuing.
   if (prev.kind === 'drafting' && next.kind === 'running') return false

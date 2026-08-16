@@ -112,6 +112,22 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       owner: AssistantActionOwnerProps
     }
     /**
+     * The chat view's render-mode ring: one list entry per rendering mode
+     * (this package ships `normal`; a plugin adds an alternative mode with a
+     * fresh id, and reusing the shipped id puts it in THAT cell and replaces
+     * it). Declared by the chat view entry (declaring is claiming); ChatView
+     * dispatches the active mode via `only: <active id>`. Mode bodies render
+     * the conversation nodes through the delegated
+     * {@link ChatRenderOwnerProps.renderSlot} binding — the node slot stays
+     * declared by the chat entry (one declarer per slot), so a mode entry
+     * declares no children of its own.
+     */
+    'conversation.chat.render': {
+      kind: 'list'
+      scope: 'session'
+      owner: ChatRenderOwnerProps
+    }
+    /**
      * The body of the details panel for the tool call the user selected —
      * one occupant, so taking it means rendering every tool's output, not just
      * the ones you know. The owner passes a frozen `block` whose two lifecycle
@@ -240,9 +256,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Think display form: inline rows in the flow vs hidden (content-anchored runs). */
-export type ThinkMode = 'inline' | 'compact'
-
 /** Owner share of the hero agent-preset chip: the shell supplies nothing. */
 export interface HeroAgentPresetOwnerProps {
   /** Marker field: the chip owns its own roster, staging, and menu state. */
@@ -348,6 +361,9 @@ export type UseChatNodeTurnData = <Key extends Extract<keyof ConversationTurnDat
   key: Key,
 ) => Readonly<ConversationTurnDataMap[Key]> | undefined
 
+/** Think display form: inline rows in the flow vs hidden (content-anchored runs). */
+export type ThinkMode = 'inline' | 'compact'
+
 /** Slot-level Hook factory used by renderers reading their Node's Turn data. */
 export interface ChatNodeTurnDataInjected {
   hooks: {
@@ -367,8 +383,9 @@ export interface ChatNodeOwnerProps {
   /** Resolve a session-authorized historical image for inline display. */
   loadImage: (attachment: ImageAttachmentRef) => Promise<string>
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
-  /** Active think display form: 'compact' hides reasoning blocks downstream. */
-  thinkMode?: 'inline' | 'compact' | undefined
+  /** Active think display form: 'compact' hides reasoning blocks downstream
+   * (the execflow render modes); absent renders the native collapsed rows. */
+  thinkMode?: ThinkMode | undefined
 }
 
 /** Full props of one registered keyed Chat business renderer. */
@@ -447,6 +464,13 @@ export interface ConversationSessionInjected {
 export interface ConversationSessionHeaderInjected {
   /** Views projected from the `conversation.view` slot ledger. */
   views: {
+    list: () => readonly ViewTab[]
+    subscribe: (fn: () => void) => () => void
+    version: () => number
+  }
+  /** Render modes projected from the 'conversation.chat.render' slot ledger
+   * (the header's tab-bar picker; same ledger shape as `views`). */
+  modes: {
     list: () => readonly ViewTab[]
     subscribe: (fn: () => void) => () => void
     version: () => number
@@ -673,6 +697,56 @@ export interface ChatScrollPosition {
   readonly scrollTop: number
 }
 
+/** The chat entry's node render binding, as delegated to render-mode bodies. */
+export type ChatNodeRenderSlot = PropsRenderSlots<'conversation.chat.node'>['renderSlot']
+
+/**
+ * Owner share of the chat view's render-mode ring: the chat entry delegates
+ * its node render seat and business verbs to every mode body. Modes are
+ * self-sufficient renderers of the same session snapshot — the framework
+ * standard kit (sessionId, useSession) arrives automatically, and everything
+ * else comes from this share.
+ */
+export interface ChatRenderOwnerProps {
+  /** The chat entry's node render binding, delegated for the mode body's rows. */
+  renderSlot: ChatNodeRenderSlot
+  /** Selection write + details panel opening in one gesture (store action + layout orchestration). */
+  openDetails: (target: SelectionTarget) => void
+  /**
+   * Open a tool-arg filesystem path with the host OS default application
+   * (relative paths resolve against the session cwd).
+   */
+  openFile: (path: string) => void
+  loadOlder: () => void
+  /** Resolve a session-authorized historical image for inline display. */
+  loadImage: (attachment: ImageAttachmentRef) => Promise<string>
+  /** Hand a call off to the trajectory view: write the one-shot inspect target and switch tabs. */
+  inspectCall: (callId: CallId) => void
+  /**
+   * Per-session scroll memory surviving view and mode switches (in-memory,
+   * never persisted): the mode body saves on every scroll and restores on
+   * remount; a fresh page load starts empty.
+   */
+  chatScroll: {
+    /** Record a semantic reader position; null clears it when pinned. */
+    save: (position: ChatScrollPosition | null) => void
+    /** Last reader position, or null when pinned or never recorded. */
+    read: () => ChatScrollPosition | null
+  }
+  /** Fork through the completed turn ending at the eligible message `seq`, then open the child. */
+  forkAt: (seq: number) => void
+  /**
+   * Prose file-mention vocabulary for one closing message, from the optional
+   * {@link ChatFileMentions} service. Undefined when the service is absent
+   * or the turn produced nothing worth linking.
+   */
+  fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
+}
+
+/** Full props of one registered chat render-mode body: standard kit, owner verbs, shared store, and locale. */
+export type ChatRenderSlotProps =
+  PropsRuntime<'conversation.chat.render'> & PropsStore<ChatStore> & PropsLocale<'conversation'>
+
 /**
  * Injected share of the chat view entry: the two callbacks whose targets live
  * outside the view (layout orchestration; the session object layer).
@@ -701,6 +775,16 @@ export interface ChatViewInjected {
     /** Last reader position, or null when pinned or never recorded. */
     read: () => ChatScrollPosition | null
   }
+  /**
+   * Render modes projected from the 'conversation.chat.render' slot ledger
+   * (same ledger shape as `views`): the selector reads entries, subscribe
+   * reacts to registrations, version pairs uSES.
+   */
+  modes: {
+    list: () => readonly ViewTab[]
+    subscribe: (fn: () => void) => () => void
+    version: () => number
+  }
   /** Fork through the completed turn ending at the eligible message `seq`, then open the child. */
   forkAt: (seq: number) => void
   /**
@@ -712,9 +796,9 @@ export interface ChatViewInjected {
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
 }
 
-/** Full chat-view component props: runtime & its Tool/command/tail render shares & store & injected & locale seat. */
+/** Full chat-view component props: runtime & its render-mode/Tool render shares & store & injected & locale seat. */
 export type ChatViewSlotProps =
-  PropsRuntime<'conversation.view'> & PropsRenderSlots<'conversation.chat.node'>
+  PropsRuntime<'conversation.view'> & PropsRenderSlots<'conversation.chat.node' | 'conversation.chat.render'>
   & PropsStore<ChatStore> & ChatViewInjected & PropsLocale<'conversation'>
 
 /**

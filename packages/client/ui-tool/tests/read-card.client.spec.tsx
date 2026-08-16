@@ -188,29 +188,32 @@ describe('ReadRow keyed toolview', () => {
     fireEvent.click(view.container.querySelector('[data-expandable]')!)
   }
 
-  it('collapses to the path summary; the whole row toggles the read card', () => {
+  it('collapses to the file-name summary; the whole row toggles the read card', () => {
     const view = render(<ReadRow {...rowProps(settled())} />)
     expect(view.getByText('Read')).toBeTruthy()
-    // Collapsed: the path is the summary link alone, and the card is absent.
-    expect(view.getAllByText('src/a.ts').length).toBe(1)
+    // Collapsed: the file NAME is the summary link alone (the path only
+    // appears inside the card), and the card is absent.
+    expect(view.getAllByText('a.ts').length).toBe(1)
+    expect(view.queryByText('src/a.ts')).toBeNull()
     expect(view.container.querySelector('[data-read]')).toBeNull()
     toggleRow(view)
-    // Expanded: the summary link stays inline and the card's banner label adds a
-    // second occurrence of the path.
-    expect(view.getAllByText('src/a.ts').length).toBe(2)
+    // Expanded: the summary link stays inline and the card's banner label
+    // carries the full path.
+    expect(view.getAllByText('a.ts').length).toBe(1)
+    expect(view.getByText('src/a.ts')).toBeTruthy()
     expect(view.container.querySelector('[data-read]')).not.toBeNull()
     expect(contentTexts(view.container)).toContain('export const a = 1')
     expect(view.getByText('显示 3 / 180 行')).toBeTruthy()
     // Collapse back in place: the card unmounts, the summary link returns.
     toggleRow(view)
     expect(view.container.querySelector('[data-read]')).toBeNull()
-    expect(view.getAllByText('src/a.ts').length).toBe(1)
+    expect(view.getAllByText('a.ts').length).toBe(1)
   })
 
-  it('the path summary opens the file through the host', () => {
+  it('the file-name summary opens the file through the host', () => {
     const openFile = vi.fn()
     const view = render(<ReadRow {...{ ...rowProps(settled()), openFile }} />)
-    fireEvent.click(view.getByRole('button', { name: 'src/a.ts' }))
+    fireEvent.click(view.getByRole('button', { name: 'a.ts' }))
     // The row derives the file path from args; the chat view resolves it against
     // the cwd before this callback opens it, so the arg path is what arrives.
     expect(openFile).toHaveBeenCalledWith('src/a.ts')

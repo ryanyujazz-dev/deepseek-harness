@@ -1,8 +1,7 @@
 import { memo, useMemo } from 'react'
 import { JsonBlock } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
+import type { ChatNodeOwnerProps, ChatNodeRenderSlot, ChatViewSlotProps, ThinkMode } from '../contract/slots.ts'
 import type { ChatNode } from '../contract/chat-nodes.ts'
-import type { ThinkMode } from './ChatView.tsx'
 import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
@@ -10,7 +9,7 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   /** Active think display form (compact hides reasoning blocks downstream). */
   readonly thinkMode?: ThinkMode | undefined
   readonly useSession: ChatViewSlotProps['useSession']
-  readonly renderSlot: ChatViewSlotProps['renderSlot']
+  readonly renderSlot: ChatNodeRenderSlot
   readonly t: ChatViewSlotProps['t']
 }
 

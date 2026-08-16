@@ -180,6 +180,29 @@ const FILE_PATH_KEYS = ['path', 'file_path'] as const
 /** File-tool variants whose summary may be an openable workspace path. */
 const FILE_PATH_VARIANTS: ReadonlySet<ToolRowVariant> = new Set(['read', 'write', 'edit'])
 
+/** Last path segment of a file path (`src/foo.ts` → `foo.ts`). */
+function fileDisplayName(path: string): string {
+  const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  return slash === -1 ? path : path.slice(slash + 1)
+}
+
+/**
+ * File-tool title summary: the target file's NAME only (the title row never
+ * shows the path — the full path stays in {@link ToolRowModel.filePath} for
+ * the host open and in the expanded args body). Path keys only, so a URL read
+ * (web_fetch) falls through to the generic summary untouched.
+ * @param variant - row variant (read/write/edit only).
+ * @param argsRaw - the call arguments.
+ * @returns the file name, or undefined when the call carries no path key.
+ */
+function deriveFileSummary(variant: ToolRowVariant, argsRaw: string): string | undefined {
+  if (!FILE_PATH_VARIANTS.has(variant)) return undefined
+  const parsed = parseArgs(argsRaw)
+  if (typeof parsed !== 'object' || parsed === null) return undefined
+  const picked = pickString(parsed as Record<string, unknown>, FILE_PATH_KEYS)
+  return picked === undefined ? undefined : fileDisplayName(firstLine(picked))
+}
+
 function deriveFilePath(variant: ToolRowVariant, argsRaw: string): string | undefined {
   if (!FILE_PATH_VARIANTS.has(variant)) return undefined
   const parsed = parseArgs(argsRaw)
@@ -215,7 +238,9 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   const state: ToolRowState = !done ? 'running'
     : block.error?.code === 'interrupted' ? 'stopped'
       : block.isError ? 'error' : 'ok'
-  const base = argsRaw === '' ? block.callId : relativizeToCwd(deriveSummary(variant, argsRaw), cwd)
+  const base = argsRaw === ''
+    ? block.callId
+    : relativizeToCwd(deriveFileSummary(variant, argsRaw) ?? deriveSummary(variant, argsRaw), cwd)
   const toolTitle = TOOL_TITLES[toolName]
   // Others keeps the static "Tool call" title (figma literal); the real tool
   // name rides the mutable summary slot unless the tool owns a specific title.

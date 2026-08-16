@@ -133,6 +133,13 @@
 }
 
 /* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned. */
+.tabsRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+}
+
 .tabs {
   position: relative;
   z-index: 1;

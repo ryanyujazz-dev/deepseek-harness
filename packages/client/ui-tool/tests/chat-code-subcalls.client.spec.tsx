@@ -270,7 +270,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
     ]
     const b = await bench(snapshotWith([codeResult(10, parent)], subCalls))
     const view = mountApp(b.slots)
-    view.getByText('notes/demo.txt').click()
+    view.getByText('demo.txt').click()
     expect(b.layout.openDetails).not.toHaveBeenCalled()
     await vi.waitFor(() => {
       expect(b.workspaces.openPath).toHaveBeenCalledWith('notes/demo.txt')

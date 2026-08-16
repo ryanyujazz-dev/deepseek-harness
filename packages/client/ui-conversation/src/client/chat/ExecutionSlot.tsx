@@ -35,6 +35,8 @@ export interface SlotDrafting {
   readonly name: string
   /** Block index in the partial, for chronological order. */
   readonly index: number
+  /** Best-effort display path (file tools) parsed from the streaming args. */
+  readonly target: string | null
 }
 
 /** Variant leading glyph for a wire tool name (mirrors GenericToolCard's table). */
@@ -54,10 +56,11 @@ function toolIcon(name: string): ReactNode {
   }
 }
 
-/** Per-tool action phrase for the aggregate header: `Edit 1 file, Read 1 file`. */
-/** One aggregate phrase: locale key + count params (the `.one` keys carry no
- * params). Unknown tools fall back to the wire name itself (a name, not copy). */
-function actionPhrase(name: string, count: number, t: Translate): string {
+/**
+ * One mapped tool's aggregate phrase: locale key + count params (the `.one`
+ * keys carry no params). Returns null for tools without a dedicated phrase.
+ */
+function mappedActionPhrase(name: string, count: number, t: Translate): string | null {
   const pair = (one: ConversationKey, many: ConversationKey): string =>
     count === 1 ? t(one) : t(many, { count })
   switch (name) {
@@ -71,14 +74,17 @@ function actionPhrase(name: string, count: number, t: Translate): string {
     case 'bash': case 'pwsh': return pair('execflow.agg.run.one', 'execflow.agg.run')
     case 'run_code': return pair('execflow.agg.program.one', 'execflow.agg.program')
     case 'todo_write': return pair('execflow.agg.todo.one', 'execflow.agg.todo')
-    default:
-      // Unmapped tools (job_output, subagent, workflow, …) degrade to the
-      // generic tool phrase; the sparkle leading icon stays.
-      return pair('execflow.agg.tools.one', 'execflow.agg.tools')
+    default: return null
   }
 }
 
-/** Aggregate text: chronological per-tool phrases joined: `Read 1 file, Edit 2 files`. */
+/**
+ * Aggregate text: mapped tools keep their per-type phrases
+ * (`Read 1 file, Edit 2 files`); unmapped tools (job_output, subagent,
+ * workflow, …) carry no dedicated phrase, so they UNIFY into ONE generic
+ * "executed N times" phrase instead of one entry per wire name — the count
+ * is the total across every unmapped member of the run.
+ */
 function aggregateText(members: readonly SlotMember[], t: Translate): string {
   const order: string[] = []
   const counts = new Map<string, number>()
@@ -86,7 +92,20 @@ function aggregateText(members: readonly SlotMember[], t: Translate): string {
     if (!counts.has(member.toolName)) order.push(member.toolName)
     counts.set(member.toolName, (counts.get(member.toolName) ?? 0) + 1)
   }
-  return order.map(name => actionPhrase(name, counts.get(name) ?? 1, t)).join(', ')
+  const phrases: string[] = []
+  let unmapped = 0
+  for (const name of order) {
+    const count = counts.get(name) ?? 1
+    const phrase = mappedActionPhrase(name, count, t)
+    if (phrase === null) unmapped += count
+    else phrases.push(phrase)
+  }
+  if (unmapped > 0) {
+    phrases.push(unmapped === 1
+      ? t('execflow.agg.tools.one')
+      : t('execflow.agg.tools', { count: unmapped }))
+  }
+  return phrases.join(', ')
 }
 
 interface ExecutionSlotProps {
@@ -109,7 +128,7 @@ function headerForm(members: readonly SlotMember[], drafting: readonly SlotDraft
   const running = members.filter(m => m.running)
   const latestRunning = running[running.length - 1]
   if (latestRunning !== undefined) return { kind: 'running', member: latestRunning }
-  if (members.length >= 2) return { kind: 'aggregate' }
+  if (members.length >= 2) return { kind: 'aggregate', rev: members.length }
   if (members.length === 1) return { kind: 'single' }
   return { kind: 'empty' }
 }
@@ -143,10 +162,15 @@ export const ExecutionSlot = memo(function ExecutionSlot({
   // header shows the aggregate summary title (never the live member); only
   // collapsed does a running/drafting member take the header. The transition
   // machine consumes this display form, so expanding plays the running →
-  // aggregate slide (the completion beat) and collapsing is instant.
+  // aggregate slide (the completion beat) and collapsing is instant. The
+  // summary counts SETTLED members and keys its revision on that count:
+  // while tools keep executing the title holds steady, and one finishing
+  // mid-run changes the revision — the controller answers with the same
+  // slide beat instead of swapping the text in place.
+  const settledCount = members.reduce((count, m) => (m.running ? count : count + 1), 0)
   const displayForm: HeaderForm = expanded && expandable && members.length >= 2
     && (form.kind === 'running' || form.kind === 'drafting')
-    ? { kind: 'aggregate' }
+    ? { kind: 'aggregate', rev: settledCount }
     : form
   const { shown, outgoing, gen } = useHeaderTransition(displayForm)
 
@@ -217,10 +241,23 @@ export const ExecutionSlot = memo(function ExecutionSlot({
                 {expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
               </span>
             </span>
-            <span className={css.aggregateText}>{aggregateText(members, t)}</span>
+            <span className={css.aggregateText}>
+              {(() => {
+                // The title summarizes the SETTLED members, capped at the
+                // form's revision: the exiting layer of a settle-beat slide
+                // carries the OLD rev, so it renders the OLD title (the
+                // members list is live — without the cap both layers would
+                // show the new count and the slide would animate nothing).
+                const settled = members.filter(m => !m.running)
+                const summarized = f.kind === 'aggregate' && settled.length > f.rev
+                  ? settled.slice(0, f.rev)
+                  : settled
+                return aggregateText(summarized, t)
+              })()}
+            </span>
           </div>
         ) : f.kind === 'drafting' && entry !== undefined ? (
-          <DraftingToolRow label={t(entry.key)} icon={entry.icon} />
+          <DraftingToolRow label={t(entry.key)} icon={entry.icon} target={f.drafting.target} />
         ) : f.kind === 'running' ? (
           renderMember(f.member.nodeKey)
         ) : f.kind === 'single' && members[0] !== undefined ? (
@@ -252,7 +289,7 @@ export const ExecutionSlot = memo(function ExecutionSlot({
           {bodyKeys.map(key => <div key={key}>{renderMember(key)}</div>)}
           {earlierDrafting.map((d) => {
             const e = draftingEntry(d.name)
-            return e === undefined ? null : <DraftingToolRow key={`draft:${d.index}`} label={t(e.key)} icon={e.icon} />
+            return e === undefined ? null : <DraftingToolRow key={`draft:${d.index}`} label={t(e.key)} icon={e.icon} target={d.target} />
           })}
         </div>
       )}

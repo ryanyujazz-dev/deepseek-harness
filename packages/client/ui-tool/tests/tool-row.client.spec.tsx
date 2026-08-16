@@ -100,9 +100,9 @@ describe('tool-call-model', () => {
 
   it('keeps summaries single-line and falls back for opaque args', () => {
     expect(toolRowModel('bash', running({ argsRaw: '{"command":"a\\nb"}' })).summary).toBe('a')
-    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/tmp/x.ts"}' })).summary).toBe('/tmp/x.ts')
-    expect(toolRowModel('write', running({ name: 'write', argsRaw: '{"file_path":"src/x.ts"}' })).summary).toBe('src/x.ts')
-    expect(toolRowModel('edit', running({ name: 'edit', argsRaw: '{"file_path":"src/x.ts"}' })).summary).toBe('src/x.ts')
+    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/tmp/x.ts"}' })).summary).toBe('x.ts')
+    expect(toolRowModel('write', running({ name: 'write', argsRaw: '{"file_path":"src/x.ts"}' })).summary).toBe('x.ts')
+    expect(toolRowModel('edit', running({ name: 'edit', argsRaw: '{"file_path":"src/x.ts"}' })).summary).toBe('x.ts')
     // Other rows prefix the real tool name into the summary slot (figma
     // flows: static "Tool call" title, the name rides the mutable summary).
     expect(toolRowModel('x', running({ argsRaw: '{"n":1}' })).summary).toBe('x · {"n":1}')
@@ -129,12 +129,12 @@ describe('tool-call-model', () => {
 
   it('displays workspace-rooted paths relative to the session cwd', () => {
     const cwd = '/Users/u/ws/'
-    expect(toolRowModel('edit', running({ name: 'edit', argsRaw: '{"file_path":"/Users/u/ws/src/x.ts"}' }), cwd).summary).toBe('src/x.ts')
+    expect(toolRowModel('edit', running({ name: 'edit', argsRaw: '{"file_path":"/Users/u/ws/src/x.ts"}' }), cwd).summary).toBe('x.ts')
     expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/Users/u/ws/a.md"}' }), cwd).summary).toBe('a.md')
     // Paths outside the workspace (and non-path summaries) stay verbatim.
-    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/etc/hosts"}' }), cwd).summary).toBe('/etc/hosts')
+    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/etc/hosts"}' }), cwd).summary).toBe('hosts')
     expect(toolRowModel('bash', running({ argsRaw: '{"command":"pwd"}' }), cwd).summary).toBe('pwd')
-    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/Users/u/ws/a.md"}' }), '').summary).toBe('/Users/u/ws/a.md')
+    expect(toolRowModel('read', running({ name: 'read', argsRaw: '{"path":"/Users/u/ws/a.md"}' }), '').summary).toBe('a.md')
   })
 
   it('body pretty-prints JSON args, keeps raw non-JSON, null when empty', () => {
@@ -214,13 +214,11 @@ describe('ToolRow', () => {
     expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('row click expands: the icon stays in every state (ExecFlow chrome), summary kept inline, body in the scrolling card', () => {
+  it('row click expands: chevron leading, summary kept inline, body in the scrolling card', () => {
     const view = render(<ToolRow {...rowProps} />)
     fireEvent.click(view.getByRole('button'))
-    // ExecDisclosureRow: the leading glyph keeps the row's own icon while
-    // open; the chevron is a hover-only overlay.
-    expect(view.queryByTestId('tool-icon')).not.toBeNull()
-    expect(view.container.querySelector('[class*="chevronHover"]')).not.toBeNull()
+    expect(view.queryByTestId('tool-icon')).toBeNull()
+    expect(view.container.querySelector('svg')).not.toBeNull()
     expect(view.getByText('List files')).toBeTruthy()
     expect(view.getByText(/"a": 1/)).toBeTruthy()
     expect(view.container.querySelector('[class*="ioCard"]')).not.toBeNull()
@@ -337,23 +335,23 @@ describe('ToolRow', () => {
     expect(view.container.querySelector('[class*="fileLink"]')).toBeNull()
   })
 
-  it('the expanded body carries an icon-only Inspect overlay that fires the callback', () => {
+  it('the expanded body carries a hover Inspect pill that fires the callback', () => {
     const inspect = vi.fn()
     const view = render(<ToolRow {...rowProps} inspect={inspect} />)
-    // Collapsed: no overlay.
-    expect(view.queryByLabelText('Inspect')).toBeNull()
+    // Collapsed: no pill.
+    expect(view.queryByRole('button', { name: 'Inspect' })).toBeNull()
     fireEvent.click(view.getByRole('button', { name: /Bash/ }))
-    const overlay = view.getByLabelText('Inspect')
-    fireEvent.click(overlay)
+    const pill = view.getByRole('button', { name: 'Inspect' })
+    fireEvent.click(pill)
     expect(inspect).toHaveBeenCalledTimes(1)
-    // The overlay click must not collapse the row (body is a .row sibling).
+    // The pill click must not collapse the row (body is a .row sibling).
     expect(view.getByRole('button', { name: /Bash/ }).getAttribute('aria-expanded')).toBe('true')
   })
 
-  it('no inspect callback, no overlay', () => {
+  it('no inspect callback, no pill', () => {
     const view = render(<ToolRow {...rowProps} />)
     fireEvent.click(view.getByRole('button'))
-    expect(view.queryByLabelText('Inspect')).toBeNull()
+    expect(view.queryByRole('button', { name: 'Inspect' })).toBeNull()
   })
 
   it('the expanded card gutter-labels each section it carries (IN / OUT)', () => {
@@ -405,7 +403,7 @@ describe('GenericToolCard', () => {
       }))} />,
     )
     expect(view.getByText('Edit')).toBeTruthy()
-    expect(view.getByText('src/x.ts')).toBeTruthy()
+    expect(view.getByText('x.ts')).toBeTruthy()
     expect(view.container.querySelector('[data-variant="edit"]')).not.toBeNull()
     expect(view.container.querySelector('svg')).not.toBeNull()
   })
@@ -418,28 +416,37 @@ describe('GenericToolCard', () => {
       }))} />,
     )
     expect(view.getByText('Write')).toBeTruthy()
-    expect(view.getByText('src/x.ts')).toBeTruthy()
+    expect(view.getByText('x.ts')).toBeTruthy()
     expect(view.container.querySelector('[data-variant="write"]')).not.toBeNull()
     expect(view.container.querySelector('svg')).not.toBeNull()
   })
 
-  it('passes the owner inspect callback through to the expanded row overlay', () => {
+  it('passes the owner inspect callback through to the expanded row pill', () => {
     const inspect = vi.fn()
     const view = render(<GenericToolCard {...props('bash', result())} inspect={inspect} />)
     fireEvent.click(view.getByRole('button', { name: /Bash/ }))
-    fireEvent.click(view.getByLabelText('Inspect'))
+    fireEvent.click(view.getByRole('button', { name: 'Inspect' }))
     expect(inspect).toHaveBeenCalledTimes(1)
   })
 
   it('file-path summary click reaches openFile; bash summary does not', () => {
     const file = props('read', running({ name: 'read', argsRaw: '{"path":"src/x.ts"}' }))
     const fileView = render(<GenericToolCard {...file} />)
-    fireEvent.click(fileView.getByText('src/x.ts'))
+    fireEvent.click(fileView.getByText('x.ts'))
     expect(file.openFile).toHaveBeenCalledWith('src/x.ts')
 
     const bash = props('bash', result())
     const bashView = render(<GenericToolCard {...bash} />)
     fireEvent.click(bashView.getByText('List files'))
     expect(bash.openFile).not.toHaveBeenCalled()
+  })
+
+  it('the execflow owner flag selects the execflow row chrome only when set', () => {
+    const plain = render(<GenericToolCard {...props('bash', result())} />)
+    expect(plain.container.querySelector('[data-execflow]')).toBeNull()
+
+    const exec = render(<GenericToolCard {...props('bash', result())} execflow />)
+    expect(exec.container.querySelector('[data-execflow]')).not.toBeNull()
+    expect(exec.container.querySelector('[data-execflow][data-state="running"]')).toBeNull()
   })
 })

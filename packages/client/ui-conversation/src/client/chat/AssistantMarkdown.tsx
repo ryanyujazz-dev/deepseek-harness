@@ -95,10 +95,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         rendered.push(<ImageGallery key={start} images={group} load={imageLoader} align="start" labels={messageImageLabels(t)} />)
         break
       }
-      // Tool-call blocks render through ExecutionSlot (the step's single
-      // morphing slot owns both the drafting and landed phases). The partial
-      // skips them here to avoid double rows; settled messages never carried
-      // them into markdown anyway.
+      // Grouped into tool rows by ChatView; hasVisible above skips an empty shell.
       case 'tool-call':
         break
       default:

@@ -38,6 +38,13 @@ export interface ToolCallOwnerProps {
   openFile: (path: string) => void
   /** Inspect this call in the trajectory view when available. */
   inspect?: (() => void) | undefined
+  /**
+   * ExecFlow row chrome: the expanded content aligns with the title column
+   * (22px) and carries the icon-axis rail; absent renders the native
+   * icon-aligned chrome. Set by the execflow render modes through the node
+   * owner's think form.
+   */
+  execflow?: boolean | undefined
 }
 
 /** Full props of a registered atomic Tool view. */

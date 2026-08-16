@@ -20,7 +20,7 @@
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  CodeBlock, DiffBlock, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, Tooltip, WebBlock,
+  CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, Tooltip, WebBlock,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WebBlockProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -29,7 +29,6 @@ import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-mod
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
 import type { ToolRowState, ToolRowVariant } from '../models/tool-call-model.ts'
-import { ExecDisclosureRow } from './ExecDisclosureRow.tsx'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
@@ -100,6 +99,12 @@ export interface ToolRowProps {
    * over the expanded body. Absent = no affordance.
    */
   inspect?: (() => void) | undefined
+  /**
+   * ExecFlow row chrome: the expanded content aligns with the title column
+   * (22px) and carries the icon-axis rail; absent renders the native
+   * icon-aligned chrome.
+   */
+  execflow?: boolean | undefined
 }
 
 /** Leading-slot state substitution: the tool icon yields to the terminal state
@@ -146,6 +151,7 @@ export function ToolRow({
   filePath,
   onOpenFile,
   inspect,
+  execflow,
 }: ToolRowProps) {
   const [expanded, setExpanded] = useState(false)
   const terminalBody = terminal ?? null
@@ -193,9 +199,9 @@ export function ToolRow({
   // row keeps DisclosureRow's icon→chevron hover preview (its default) instead
   // of losing it with the icon.
   return (
-    <div className={css.root} data-variant={variant} data-tool={toolName} data-state={state}>
+    <div className={css.root} data-variant={variant} data-tool={toolName} data-state={state} data-execflow={execflow || undefined}>
       {status !== null && <span className={css.visuallyHidden}>{status}</span>}
-      <ExecDisclosureRow
+      <DisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
         titleClassName={css.title}
@@ -304,7 +310,7 @@ export function ToolRow({
             </Tooltip>
           )}
         </div>
-      </ExecDisclosureRow>
+      </DisclosureRow>
     </div>
   )
 }
