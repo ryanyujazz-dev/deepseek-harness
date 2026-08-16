@@ -1,4 +1,4 @@
-/* ExecutionSlot: one contiguous tool run rendered as a single morphing slot.
+﻿/* ExecutionSlot: one contiguous tool run rendered as a single morphing slot.
    Header crossfades between forms (drafting / running / aggregate / single
    body) at a fixed 24px row height so the flow never shifts. */
 

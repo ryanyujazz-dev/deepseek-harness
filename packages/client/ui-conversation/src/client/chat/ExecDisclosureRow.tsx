@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ExecDisclosureRow: vendored DisclosureRow for the execflow tab with ONE
  * behavior change — the leading glyph keeps showing the row's own icon in
  * EVERY state (collapsed and expanded alike); the chevron appears only on

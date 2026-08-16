@@ -16,7 +16,7 @@
   --dsl-terminal-font: var(--dsw-font-markdown-code-block-small);
   --dsl-terminal-line-height: 18px;
   --dsl-terminal-output-max-height: 224px;
-  margin: 4px 0 4px 22px;
+  margin: 4px 0 4px 4px;
   border: 1px solid var(--dsw-alias-border-l1);
 }
 
@@ -26,11 +26,33 @@
 .ioCard {
   display: flex;
   flex-direction: column;
-  margin: 4px 0 4px 22px;
+  margin: 4px 0 4px 4px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 12px;
   background: var(--dsw-alias-markdown-code-block);
   font: var(--dsw-font-markdown-code-block-small);
+}
+
+/* ExecFlow row chrome (selected by the execflow render modes): the terminal
+   and IO cards indent to the title column (22px) and carry the think-style
+   rail on the icon centerline — the cards sit at margin-left 22px, so the
+   rail anchors back at -14.5px (= x8 absolute). */
+.card[data-execflow] .terminal,
+.card[data-execflow] .ioCard {
+  position: relative;
+  margin: 4px 0 4px 22px;
+}
+
+.card[data-execflow] .terminal::before,
+.card[data-execflow] .ioCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -14.5px;
+  width: 1px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
 }
 
 .ioSection {
@@ -188,18 +210,15 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
-/* Hover-revealed Inspect pill under the expanded terminal's bottom-left —
-   ToolRow's .bodyWrap/.inspectButton treatment, replicated per the registrant
-   posture: real flow (it reserves its line), revealed by hovering anywhere on
-   the tool call — title row included — or by keyboard focus. */
+/* Inspect affordance: an icon-only hover-revealed overlay at the expanded
+   block's top-right corner (title tooltip on hover) — ToolRow's treatment,
+   replicated per the registrant posture; absolute so it costs no line. */
 .bodyWrap {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
 
-/* Inspect affordance: an icon-only hover-revealed overlay at the expanded
-   block's top-right corner (title tooltip on hover); absolute so it costs
-   no line of layout. */
 .inspectButton {
   position: absolute;
   top: -22px;
@@ -219,6 +238,11 @@
   z-index: 1;
 }
 
+.card:hover .inspectButton,
+.inspectButton:focus-visible {
+  opacity: 1;
+}
+
 .inspectButton:hover {
   color: var(--dsw-alias-label-primary);
 }
@@ -231,29 +255,4 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
-}
-
-/* ExecFlow: think-style rail on the icon centerline for the expanded
-   terminal / IO cards (they sit at margin-left 22px, so the rail anchors
-   back at -14.5px = x8 absolute). */
-.terminal,
-.ioCard {
-  position: relative;
-}
-
-.terminal::before,
-.ioCard::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -14.5px;
-  width: 1px;
-  background: var(--dsw-alias-border-l2);
-  pointer-events: none;
-}
-
-.root:hover .inspectButton,
-.inspectButton:focus-visible {
-  opacity: 1;
 }

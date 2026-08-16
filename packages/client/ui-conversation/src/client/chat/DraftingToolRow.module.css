@@ -1,4 +1,4 @@
-/* Drafting tool row: same 24px geometry as ToolRow so the drafting → running
+﻿/* Drafting tool row: same 24px geometry as ToolRow so the drafting → running
    transition swaps content without layout shift. Content color + the running
    sweep while the model is still composing the tool's arguments. */
 

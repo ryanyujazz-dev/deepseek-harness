@@ -17,7 +17,7 @@ import { useState, type KeyboardEvent } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import clsx from 'clsx'
 import {
-  IconApiOutline14, IconChevronDownOutline14, IconChevronRightOutline14, IconInspectOutline12, StateDot, TerminalBlock, Tooltip,
+  IconApiOutline14, IconChevronDownOutline14, IconInspectOutline12, StateDot, TerminalBlock, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
@@ -53,7 +53,7 @@ function stateStatus(state: ToolRowState, t: BashRowProps['t']): string | null {
  * whole row toggling the command's terminal or generic error card (ToolRow's unified
  * expand interaction, replicated locally per the registrant posture).
  */
-export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }: BashRowProps) {
+export function BashRow({ toolName, block, sessionId, useSessions, inspect, execflow, t }: BashRowProps) {
   const model = toolRowModel(toolName, block)
   // Session workspace root: the terminal view's cwd resolves against it (an
   // omitted workdir IS the workspace), which the pure presenter cannot do.
@@ -83,21 +83,18 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
     event.preventDefault()
     toggleExpand()
   }
-  // ExecFlow: the icon stays in every state; the chevron is hover-only and
-  // directional — right while collapsed (opens), down while expanded (closes).
-  const hoverChevron = open
-    ? <IconChevronDownOutline14 className={clsx(css.chevron, css.chevronHover)} />
-    : <IconChevronRightOutline14 className={clsx(css.chevron, css.chevronHover)} />
-  const leading = expandable
-    ? (
-      <>
-        <span className={css.iconIdle}>{leadingFor(state)}</span>
-        {hoverChevron}
-      </>
-    )
-    : leadingFor(state)
+  const leading = open
+    ? <IconChevronDownOutline14 className={css.chevron} />
+    : expandable
+      ? (
+        <>
+          <span className={css.iconIdle}>{leadingFor(state)}</span>
+          <IconChevronDownOutline14 className={clsx(css.chevron, css.chevronHover)} />
+        </>
+      )
+      : leadingFor(state)
   return (
-    <div className={css.card}>
+    <div className={css.card} data-execflow={execflow || undefined}>
       <div
         className={css.root}
         data-sample="bash"

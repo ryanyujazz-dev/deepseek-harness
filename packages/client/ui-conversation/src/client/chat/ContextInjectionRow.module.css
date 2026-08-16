@@ -14,7 +14,7 @@
    body is already title-left-aligned at 22px. The rail spans the body's
    column (28px = the 24px header row plus the body's 4px top gap) and stops
    at the row's open padding. */
-.root[data-open]::before {
+.execflow[data-open]::before {
   content: '';
   position: absolute;
   top: 28px;

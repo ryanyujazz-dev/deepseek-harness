@@ -1,4 +1,4 @@
-/** Assistant reasoning disclosure, independent of Tool-call presentation. */
+﻿/** Assistant reasoning disclosure, independent of Tool-call presentation. */
 import { IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ExecDisclosureRow } from './ExecDisclosureRow.tsx'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'

@@ -15,11 +15,12 @@ import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
-import type { ChatViewSlotProps, SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatRenderSlotProps } from '../src/client/contract/slots.ts'
+import type { SelectionTarget } from '../src/client/contract/views.ts'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { createChatStore } from '../src/client/stores.ts'
-import { ChatView } from '../src/client/chat/ChatView.tsx'
+import { ExecFlowBody, type ExecFlowBodyProps } from '../src/client/chat/ExecFlowBody.tsx'
 import { zh } from '../src/client/locales.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 import type { AssistantMessageNode, UserMessageNode } from '@deepseek-ai/dsh-client-runtime/client'
@@ -111,8 +112,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const openFile = vi.fn<(path: string) => void>()
   const loadOlder = vi.fn()
   const inspectCall = vi.fn<(callId: string) => void>()
-  let savedScroll: ReturnType<ChatViewSlotProps['chatScroll']['read']> = null
-  const chatScroll: ChatViewSlotProps['chatScroll'] = {
+  let savedScroll: ReturnType<ChatRenderSlotProps['chatScroll']['read']> = null
+  const chatScroll: ChatRenderSlotProps['chatScroll'] = {
     save: (position) => { savedScroll = position },
     read: () => savedScroll,
   }
@@ -120,9 +121,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const chat = createChatStore().create()
   const t = makeTranslate(zh, commonZh)
   const renderSlot = ((_key: string, _owner: object, opts?: { fallback?: React.ReactNode }) =>
-    opts?.fallback ?? null) as unknown as ChatViewSlotProps['renderSlot']
-  const SessionProviderStub: ChatViewSlotProps['SessionProvider'] = ({ children }) => <>{children(SID)}</>
-  const props: ChatViewSlotProps = {
+    opts?.fallback ?? null) as unknown as ChatRenderSlotProps['renderSlot']
+  const props: ExecFlowBodyProps = {
     sessionId: SID,
     useSession: bindSnapshotSelector(source),
     useSessions: emptySessions(),
@@ -139,7 +139,6 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     useStore: bindSnapshotSelector(chat),
     actions: chat.actions,
     renderSlot,
-    SessionProvider: SessionProviderStub,
     openDetails,
     openFile,
     loadOlder,
@@ -149,8 +148,10 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     forkAt,
     fileMentions: () => undefined,
     t,
+    thinkForm: 'compact',
+    siblingId: 'think',
   }
-  return { set, ChatView, props, openDetails, openFile, loadOlder, inspectCall, chatScroll, forkAt }
+  return { set, Body: ExecFlowBody, props, openDetails, openFile, loadOlder, inspectCall, chatScroll, forkAt }
 }
 
 describe('ExecFlow partition and slot forms', () => {
@@ -166,7 +167,7 @@ describe('ExecFlow partition and slot forms', () => {
       ],
       runningCalls: [],
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     // One aggregate: 3 tools in the run → the zh dictionary phrase.
     const aggregate = container.querySelector('[class*="aggregate"][role="button"]')
     expect(aggregate).not.toBeNull()
@@ -186,7 +187,7 @@ describe('ExecFlow partition and slot forms', () => {
         assistant(3, 'done', 1),
       ],
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     // No aggregate form (single member → the slot is transparent); the
     // fallback JsonBlock renders the tool node through the seat fallback.
     expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
@@ -204,7 +205,7 @@ describe('ExecFlow partition and slot forms', () => {
         assistant(7, 'end', 1),
       ],
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     const aggregates = container.querySelectorAll('[class*="aggregate"][role="button"]')
     expect(aggregates[0]?.textContent).toContain('运行 2 条命令')
     expect(aggregates[1]?.textContent).toContain('运行 2 条命令')
@@ -224,12 +225,10 @@ describe('ExecFlow partition and slot forms', () => {
         assistant(7, 'end', 1),
       ],
     })
-    localStorage.setItem('dsh.execflow.think-mode', 'inline')
-    const inlineRender = render(<inline.ChatView {...inline.props} />)
+    const inlineRender = render(<inline.Body {...inline.props} thinkForm="inline" />)
     expect(inlineRender.container.querySelectorAll('[class*="aggregate"][role="button"]')).toHaveLength(2)
     inlineRender.unmount()
 
-    localStorage.setItem('dsh.execflow.think-mode', 'compact')
     const compact = makeHarness({
       nodes: [
         user(1, 'go'),
@@ -241,7 +240,7 @@ describe('ExecFlow partition and slot forms', () => {
         assistant(7, 'end', 1),
       ],
     })
-    const compactRender = render(<compact.ChatView {...compact.props} />)
+    const compactRender = render(<compact.Body {...compact.props} thinkForm="compact" />)
     const aggregates = compactRender.container.querySelectorAll('[class*="aggregate"][role="button"]')
     expect(aggregates).toHaveLength(1)
     expect(aggregates[0]?.textContent).toContain('运行 4 条命令')
@@ -256,7 +255,7 @@ describe('ExecFlow partition and slot forms', () => {
         blocks: [{ kind: 'tool-call', callId: 'call-9', name: 'edit', argsRaw: '{"file_path":"a.ts"' }],
       },
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     expect(container.textContent).toContain('Editing')
     // Unmapped short-drafting tools render no drafting row.
     const h2 = makeHarness({
@@ -266,7 +265,7 @@ describe('ExecFlow partition and slot forms', () => {
         blocks: [{ kind: 'tool-call', callId: 'call-9', name: 'read', argsRaw: '{"path":"a.ts"' }],
       },
     })
-    const r2 = render(<h2.ChatView {...h2.props} />)
+    const r2 = render(<h2.Body {...h2.props} />)
     expect(r2.container.textContent).not.toContain('Reading')
   })
 
@@ -280,7 +279,7 @@ describe('ExecFlow partition and slot forms', () => {
         blocks: [{ kind: 'tool-call', callId: 'call-9', name: 'edit', argsRaw: '{"file_path":"src/foo.ts"}' }],
       },
     })
-    const full = render(<complete.ChatView {...complete.props} />)
+    const full = render(<complete.Body {...complete.props} />)
     expect(full.container.textContent).toContain('Editing')
     expect(full.container.textContent).toContain('foo.ts')
     expect(full.container.textContent).not.toContain('src/foo.ts')
@@ -294,7 +293,7 @@ describe('ExecFlow partition and slot forms', () => {
         blocks: [{ kind: 'tool-call', callId: 'call-9', name: 'edit', argsRaw: '{"file_path":"b.' }],
       },
     })
-    const partial = render(<truncated.ChatView {...truncated.props} />)
+    const partial = render(<truncated.Body {...truncated.props} />)
     expect(partial.container.textContent).toContain('Editing')
     expect(partial.container.textContent).not.toContain('b.')
     partial.unmount()
@@ -307,7 +306,7 @@ describe('ExecFlow partition and slot forms', () => {
         blocks: [{ kind: 'tool-call', callId: 'call-9', name: 'run_code', argsRaw: '{"code":"x()"}' }],
       },
     })
-    const code = render(<runCode.ChatView {...runCode.props} />)
+    const code = render(<runCode.Body {...runCode.props} />)
     expect(code.container.textContent).toContain('Coding')
     expect(code.container.querySelectorAll('[class*="target"]')).toHaveLength(0)
   })
@@ -319,7 +318,7 @@ describe('ExecFlow partition and slot forms', () => {
       nodes: [user(1, 'go'), toolResult(2, 'call-1')],
       runningCalls: [{ ...runningCall('call-2'), turn: 1 }],
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     // Collapsed: the live member heads the slot — no aggregate.
     expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
 
@@ -355,7 +354,7 @@ describe('ExecFlow partition and slot forms', () => {
       nodes: [user(1, 'go'), toolResult(2, 'call-1')],
       runningCalls: [{ ...runningCall('call-2'), turn: 1 }],
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     fireEvent.click(container.querySelector('[class*="header"][role="button"]')!)
     await waitFor(() => {
       expect(container.querySelector('[class*="layerOutWindow"]')).toBeNull()
@@ -403,7 +402,7 @@ describe('ExecFlow partition and slot forms', () => {
       runningCalls: [runningCall('a', 'read'), runningCall('b', 'edit')],
       running: true,
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     expect(container.querySelector('[class*="aggregate"][role="button"]')).toBeNull()
 
     // B settles; A still runs — the header must NOT become an aggregate.
@@ -452,15 +451,50 @@ describe('ExecFlow partition and slot forms', () => {
         assistant(4, 'done', 1),
       ],
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     const agg = container.querySelector('[class*="aggregate"][role="button"]')
-    expect(agg?.textContent).toContain('执行 2 个工具')
+    expect(agg?.textContent).toContain('执行 2 次工具')
+  })
+
+  it('unmapped tools of different kinds unify into ONE generic phrase', () => {
+    // job_output + subagent have no dedicated phrases: the aggregate must NOT
+    // list one phrase per wire name — a single "executed N times" covers the
+    // total across every unmapped member.
+    const h = makeHarness({
+      nodes: [
+        user(1, 'go'),
+        { ...toolResult(2, 'j1', 'job_output', 1), turn: 1 } as never,
+        { ...toolResult(3, 's1', 'subagent', 1), turn: 1 } as never,
+        assistant(4, 'done', 1),
+      ],
+    })
+    const { container } = render(<h.Body {...h.props} />)
+    const agg = container.querySelector('[class*="aggregate"][role="button"]')
+    expect(agg?.textContent).toContain('执行 2 次工具')
+    // One phrase only: the wire names never surface separately.
+    expect(agg?.textContent?.match(/执行/g)).toHaveLength(1)
+  })
+
+  it('mapped and unmapped tools coexist: per-type phrases plus one generic tail', () => {
+    const h = makeHarness({
+      nodes: [
+        user(1, 'go'),
+        { ...toolResult(2, 'r1', 'read', 1), turn: 1 } as never,
+        { ...toolResult(3, 'j1', 'job_output', 1), turn: 1 } as never,
+        { ...toolResult(4, 'j2', 'job_output', 1), turn: 1 } as never,
+        assistant(5, 'done', 1),
+      ],
+    })
+    const { container } = render(<h.Body {...h.props} />)
+    const agg = container.querySelector('[class*="aggregate"][role="button"]')
+    expect(agg?.textContent).toContain('读取 1 个文件')
+    expect(agg?.textContent).toContain('执行 2 次工具')
   })
 
   it('registers the aggregate fallback dictionary keys in both locales', async () => {
     const mod = await import('../src/client/locales.ts')
-    expect(mod.zh['execflow.agg.tools']).toBe('执行 {count} 个工具')
-    expect(mod.zh['execflow.agg.tools.one']).toBe('执行 1 个工具')
+    expect(mod.zh['execflow.agg.tools']).toBe('执行 {count} 次工具')
+    expect(mod.zh['execflow.agg.tools.one']).toBe('执行 1 次工具')
     expect(mod.en['execflow.agg.tools']).toBe('Use {count} tools')
     expect(mod.en['execflow.agg.tools.one']).toBe('Use 1 tool')
   })
@@ -473,7 +507,7 @@ describe('ExecFlow partition and slot forms', () => {
       ],
       runningCalls: [runningCall('call-2')],
     })
-    const { container } = render(<h.ChatView {...h.props} />)
+    const { container } = render(<h.Body {...h.props} />)
     // No aggregate while a member runs, and the RUNNING member heads the
     // slot: it renders through the seat's JsonBlock fallback (the harness
     // has no Tool presentation plugin), so its node kind reaches the DOM.

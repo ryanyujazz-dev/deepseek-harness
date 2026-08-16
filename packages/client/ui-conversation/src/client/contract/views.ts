@@ -24,6 +24,12 @@ export interface ChatStoreState {
   /** Active conversation view id ('conversation.view' entry id); null falls back to Chat. */
   view: string | null
   /**
+   * Active chat render-mode id ('conversation.chat.render' entry id); null
+   * falls back to the shipped `normal` mode. Unknown persisted ids (a mode
+   * plugin removed since) fall back the same way.
+   */
+  renderMode: string | null
+  /**
    * One-shot inspect handoff: chat writes the call to reveal, the trajectory
    * view consumes it and acknowledges by clearing. Read with `?? null` —
    * persisted snapshots from before this field rehydrate without it.

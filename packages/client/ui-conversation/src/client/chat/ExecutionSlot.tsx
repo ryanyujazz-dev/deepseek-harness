@@ -56,10 +56,11 @@ function toolIcon(name: string): ReactNode {
   }
 }
 
-/** Per-tool action phrase for the aggregate header: `Edit 1 file, Read 1 file`. */
-/** One aggregate phrase: locale key + count params (the `.one` keys carry no
- * params). Unknown tools fall back to the wire name itself (a name, not copy). */
-function actionPhrase(name: string, count: number, t: Translate): string {
+/**
+ * One mapped tool's aggregate phrase: locale key + count params (the `.one`
+ * keys carry no params). Returns null for tools without a dedicated phrase.
+ */
+function mappedActionPhrase(name: string, count: number, t: Translate): string | null {
   const pair = (one: ConversationKey, many: ConversationKey): string =>
     count === 1 ? t(one) : t(many, { count })
   switch (name) {
@@ -73,14 +74,17 @@ function actionPhrase(name: string, count: number, t: Translate): string {
     case 'bash': case 'pwsh': return pair('execflow.agg.run.one', 'execflow.agg.run')
     case 'run_code': return pair('execflow.agg.program.one', 'execflow.agg.program')
     case 'todo_write': return pair('execflow.agg.todo.one', 'execflow.agg.todo')
-    default:
-      // Unmapped tools (job_output, subagent, workflow, …) degrade to the
-      // generic tool phrase; the sparkle leading icon stays.
-      return pair('execflow.agg.tools.one', 'execflow.agg.tools')
+    default: return null
   }
 }
 
-/** Aggregate text: chronological per-tool phrases joined: `Read 1 file, Edit 2 files`. */
+/**
+ * Aggregate text: mapped tools keep their per-type phrases
+ * (`Read 1 file, Edit 2 files`); unmapped tools (job_output, subagent,
+ * workflow, …) carry no dedicated phrase, so they UNIFY into ONE generic
+ * "executed N times" phrase instead of one entry per wire name — the count
+ * is the total across every unmapped member of the run.
+ */
 function aggregateText(members: readonly SlotMember[], t: Translate): string {
   const order: string[] = []
   const counts = new Map<string, number>()
@@ -88,7 +92,20 @@ function aggregateText(members: readonly SlotMember[], t: Translate): string {
     if (!counts.has(member.toolName)) order.push(member.toolName)
     counts.set(member.toolName, (counts.get(member.toolName) ?? 0) + 1)
   }
-  return order.map(name => actionPhrase(name, counts.get(name) ?? 1, t)).join(', ')
+  const phrases: string[] = []
+  let unmapped = 0
+  for (const name of order) {
+    const count = counts.get(name) ?? 1
+    const phrase = mappedActionPhrase(name, count, t)
+    if (phrase === null) unmapped += count
+    else phrases.push(phrase)
+  }
+  if (unmapped > 0) {
+    phrases.push(unmapped === 1
+      ? t('execflow.agg.tools.one')
+      : t('execflow.agg.tools', { count: unmapped }))
+  }
+  return phrases.join(', ')
 }
 
 interface ExecutionSlotProps {

@@ -128,7 +128,7 @@ describe('keyed toolview hole through the real machinery', () => {
     await b.runtime.dispose()
   })
 
-  it('file-name clicks travel owner openFile → chat inject → workspaces.openPath', async () => {
+  it('file-path clicks travel owner openFile → chat inject → workspaces.openPath', async () => {
     const b = await bench([toolResult(3, 'c1', 'read', '{"path":"src/a.ts"}')])
     const view = b.runtime.renderRoot()
     view.getByText('a.ts').click()

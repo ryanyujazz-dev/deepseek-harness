@@ -19,10 +19,12 @@ import { RpcId } from '@deepseek-ai/dsh-client-connection/client'
 import type {
   ChatNode, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatRenderSlotProps } from '../src/client/contract/slots.ts'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { ChatView } from '../src/client/chat/ChatView.tsx'
+import { ChatRenderStandard } from '../src/client/chat/ChatRenderStandard.tsx'
 import { zh } from '../src/client/locales.ts'
 import { AssistantNodeView } from '../src/client/chat/AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from '../src/client/chat/CommandNodeView.tsx'
@@ -149,6 +151,27 @@ function emptyWorkspaces() {
   return bindSnapshotSelector(store)
 }
 
+/** Render the real shipped mode body (`ChatRenderStandard`) with an owner
+ * share: the harness default and every custom node-slot override route the
+ * render-mode ring through here, so body-behavior tests keep exercising the
+ * actual component through ChatView's dispatch. */
+function renderShippedMode(owner: object, props: ChatViewSlotProps): React.ReactNode {
+  return (
+    <ChatRenderStandard {...({
+      ...owner,
+      sessionId: props.sessionId,
+      useSession: props.useSession,
+      useSessions: props.useSessions,
+      useWorkspaces: props.useWorkspaces,
+      useProjection: props.useProjection,
+      useInput: props.useInput,
+      inputActions: props.inputActions,
+      useStore: props.useStore,
+      t: props.t,
+    } as unknown as ChatRenderSlotProps)} />
+  )
+}
+
 function makeHarness(init?: Partial<ConversationSnapshot>) {
   const { set, source } = makeSource(init)
   const openDetails = vi.fn<(t: SelectionTarget) => void>()
@@ -162,6 +185,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     read: () => savedScroll,
   }
   const forkAt = vi.fn()
+  // The mode id ChatView dispatched at the last render (the ring's `only`).
+  let renderedOnly: string | undefined
   // Selection rides the REAL chat store (same construction path as
   // production; the view reads it through the PropsStore useStore share).
   const chat = createChatStore().create()
@@ -183,7 +208,15 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const renderSlot = ((key: string, owner: object, opts?: {
     fallback?: React.ReactNode
     hookContext?: unknown
+    only?: string
   }) => {
+    if (key === 'conversation.chat.render') {
+      // The mode ring dispatches the REAL shipped body: body-behavior tests
+      // keep exercising the actual component through ChatView's dispatch
+      // (the only difference from production is the missing renderer).
+      renderedOnly = opts?.only
+      return renderShippedMode(owner, props)
+    }
     if (key !== 'conversation.chat.node') return opts?.fallback ?? null
     const nodeOwner = owner as RoutedChatNodeOwner
     const nodeKey = opts?.hookContext as string | undefined
@@ -289,13 +322,21 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     forkAt,
     // Absent-service default; mention tests override with a real resolver.
     fileMentions: () => undefined,
+    // The render-mode ledger: only the shipped mode by default, so the
+    // selector stays hidden and the ring dispatches `normal`.
+    modes: {
+      list: () => [{ id: 'normal', label: 'Standard' }],
+      subscribe: () => () => {},
+      version: () => 0,
+    },
     // Mirrors the real lookup chain (conversation namespace, then common).
     t,
   }
   const setSelection = (next: SelectionTarget | null): void => { chat.actions.select(next) }
   return {
     set, ChatView, props, openDetails, openFile, loadOlder, inspectCall,
-    chatScroll, forkAt, setSelection, toolOwners,
+    chatScroll, forkAt, setSelection, toolOwners, renderedOnly: () => renderedOnly,
+    snapshot: () => chat.getSnapshot(),
   }
 }
 
@@ -844,9 +885,10 @@ describe('ChatView', () => {
     // Count renderSlot invocations: the memo boundary holds when CallRow does
     // not re-render, so the row's renderSlot call count freezes during chunks.
     let rowRenders = 0
-    h.props.renderSlot = ((key: string, owner: object) => {
+    h.props.renderSlot = ((key: string, owner: object, opts?: { only?: string; fallback?: React.ReactNode }) => {
+      if (key === 'conversation.chat.render') return renderShippedMode(owner, h.props)
       if (key !== 'conversation.chat.node'
-        || (owner as RoutedChatNodeOwner).node.kind !== 'tool-call') return null
+        || (owner as RoutedChatNodeOwner).node.kind !== 'tool-call') return opts?.fallback ?? null
       rowRenders += 1
       return <div data-testid="counting-row" />
     })
@@ -899,7 +941,8 @@ describe('ChatView', () => {
       runningCalls: [runningCall('r1')],
       running: true,
     })
-    h.props.renderSlot = ((key: string, owner: object, opts?: { fallback?: React.ReactNode }) => {
+    h.props.renderSlot = ((key: string, owner: object, opts?: { only?: string; fallback?: React.ReactNode }) => {
+      if (key === 'conversation.chat.render') return renderShippedMode(owner, h.props)
       const routed = owner as RoutedChatNodeOwner
       return key === 'conversation.chat.node' && routed.node.kind === 'tool-call'
         ? <StatefulToolNode node={routed.node} />
@@ -913,7 +956,7 @@ describe('ChatView', () => {
 
     act(() => {
       h.set({
-        nodes: [user(1, 'q'), { ...toolResult(3, 'r1'), turn: 2 } as never, assistant(4, 'later')],
+        nodes: [user(1, 'q'), toolResult(3, 'r1'), assistant(4, 'later')],
         runningCalls: [],
         running: false,
       })
@@ -954,11 +997,14 @@ describe('ChatView', () => {
     const block = toolResult(3, 'a')
     const h = makeHarness({ nodes: [block] })
     const calls: { key: string; owner: object; entryKey?: string }[] = []
-    h.props.renderSlot = ((key: string, owner: object, opts?: { entryKey?: string; fallback?: React.ReactNode }) => {
+    h.props.renderSlot = ((key: string, owner: object, opts?: { only?: string; entryKey?: string; fallback?: React.ReactNode }) => {
+      if (key === 'conversation.chat.render') return renderShippedMode(owner, h.props)
       calls.push({ key, owner, ...(opts?.entryKey !== undefined ? { entryKey: opts.entryKey } : {}) })
       return opts?.fallback ?? null
     })
     render(<h.ChatView {...h.props} />)
+    // The dispatch chain is now two hops: the ring (`conversation.chat.render`)
+    // then the mode body's node seat. Only the node hop lands in the ledger.
     expect(calls).toHaveLength(1)
     expect(calls[0]).toMatchObject({
       key: 'conversation.chat.node',
@@ -1353,5 +1399,43 @@ describe('ChatView', () => {
     const failedView = render(<failed.ChatView {...failed.props} />)
     expect(failedView.getByText('Compaction cancelled.')).toBeTruthy()
     expect(failedView.container.querySelector('[data-state="error"]')).not.toBeNull()
+  })
+})
+
+describe('ChatView render-mode ring', () => {
+  it('dispatches the shipped mode while only normal is registered', () => {
+    const h = makeHarness()
+    render(<h.ChatView {...h.props} />)
+    expect(h.renderedOnly()).toBe('normal')
+  })
+
+  it('dispatches the persisted mode once a second mode registers', () => {
+    const h = makeHarness()
+    h.props.actions.setRenderMode('execflow')
+    const modes = {
+      list: () => [
+        { id: 'normal', label: 'Native mode' },
+        { id: 'execflow', label: 'ExecFlow' },
+      ],
+      subscribe: () => () => {},
+      version: () => 0,
+    }
+    render(<h.ChatView {...h.props} modes={modes} />)
+    expect(h.renderedOnly()).toBe('execflow')
+  })
+
+  it('falls back to the shipped mode when the persisted id is gone', () => {
+    const h = makeHarness()
+    h.props.actions.setRenderMode('ghost')
+    const modes = {
+      list: () => [
+        { id: 'normal', label: 'Native mode' },
+        { id: 'execflow', label: 'ExecFlow' },
+      ],
+      subscribe: () => () => {},
+      version: () => 0,
+    }
+    render(<h.ChatView {...h.props} modes={modes} />)
+    expect(h.renderedOnly()).toBe('normal')
   })
 })

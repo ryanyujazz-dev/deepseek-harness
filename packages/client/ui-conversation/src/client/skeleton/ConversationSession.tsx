@@ -7,6 +7,8 @@ import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
 } from '../contract/slots.ts'
 import type { ViewTab } from '../contract/views.ts'
+import { ChatRenderMenu } from '../chat/ChatRenderMenu.tsx'
+import { resolveActiveMode } from '../chat/render-modes.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -60,16 +62,24 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
  */
 export function ConversationSessionHeader({
   sessionId, useSession, useSessions, useStore, actions,
-  renderSlot, views, open, t,
+  renderSlot, views, modes, open, t,
 }: ConversationSessionHeaderProps) {
   useSyncExternalStore(views.subscribe, views.version)
+  useSyncExternalStore(modes.subscribe, modes.version)
   const tabs = views.list()
+  const modeTabs = modes.list()
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
+  const selectedMode = useStore(s => s.renderMode)
+  const activeMode = resolveActiveMode(modeTabs, selectedMode)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
   const hideChrome = blank && composerPhase === 'blank'
+  // The render-mode ring belongs to the chat view, but the picker stays on
+  // the tab bar on every view so it is always discoverable; the switch takes
+  // effect when the chat tab renders.
+  const pickerVisible = modeTabs.length > 1 && activeMode !== undefined
 
   return (
     <header
@@ -107,20 +117,32 @@ export function ConversationSessionHeader({
               {renderSlot('conversation.session.header.utilities', {})}
             </div>
           </div>
-          {tabs.length > 1 && (
-            <div className={css.tabs} role="tablist">
-              {tabs.map(viewTab => (
-                <button
-                  key={viewTab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewTab.id === active?.id}
-                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { actions.setView(viewTab.id) }}
-                >
-                  {viewTab.label}
-                </button>
-              ))}
+          {(tabs.length > 1 || pickerVisible) && (
+            <div className={css.tabsRow} data-chat-tabs-row="">
+              {tabs.length > 1 && (
+                <div className={css.tabs} role="tablist">
+                  {tabs.map(viewTab => (
+                    <button
+                      key={viewTab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={viewTab.id === active?.id}
+                      className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+                      onClick={() => { actions.setView(viewTab.id) }}
+                    >
+                      {viewTab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {pickerVisible && (
+                <ChatRenderMenu
+                  modes={modeTabs}
+                  activeId={activeMode.id}
+                  onPick={(id) => { actions.setRenderMode(id) }}
+                  t={t}
+                />
+              )}
             </div>
           )}
         </>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DraftingToolRow: the pre-call phase of one long-drafting tool, rendered
  * inside the streaming assistant partial at the tool-call block's position.
  * The model is still composing the tool's arguments (block-start → the

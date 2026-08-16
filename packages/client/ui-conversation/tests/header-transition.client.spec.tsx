@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 const drafting = (name: string, index: number) =>
-  ({ kind: 'drafting' as const, drafting: { name, index } })
+  ({ kind: 'drafting' as const, drafting: { name, index, target: null } })
 const running = (nodeKey: string, toolName = 'read') =>
   ({ kind: 'running' as const, member: { nodeKey, toolName, running: true } })
 const aggregate = (rev = 2) => ({ kind: 'aggregate' as const, rev })

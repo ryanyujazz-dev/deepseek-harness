@@ -99,6 +99,8 @@ function mount(
     composerBlock?: { reason: string }
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** Mutable render-mode ledger for the header's tab-bar picker. */
+    renderModes?: ViewTab[]
   } = {},
 ) {
   const root = sid('root')
@@ -135,6 +137,12 @@ function mount(
     subscribe: () => () => {},
     version: () => 1,
   }
+  const modeTabs = options.renderModes ?? [{ id: 'normal', label: 'Native mode' }]
+  const modes = {
+    list: () => modeTabs,
+    subscribe: () => () => {},
+    version: () => 1,
+  }
   /** Owner share handed to the two composer tool-row seats, per render. */
   const seatOwners: { key: string; owner: unknown }[] = []
   let pickerOwner: unknown
@@ -159,6 +167,7 @@ function mount(
           actions={chat.actions}
           renderSlot={renderSlot as never}
           views={views}
+          modes={modes}
           open={open}
           t={t}
         />
@@ -494,5 +503,54 @@ describe('ConversationRoot resident composer', () => {
     }))
     expect(b.view.getByRole('alert').textContent).toContain('Message send failed (offline)')
     expect(b.view.queryByRole('button', { name: 'Retry' })).toBeNull()
+  })
+})
+
+describe('ConversationSessionHeader render-mode picker', () => {
+  const THREE_MODES = [
+    { id: 'normal', label: '原生模式' },
+    { id: 'classic', label: '经典模式' },
+    { id: 'think', label: '思考模式' },
+  ]
+
+  it('keeps the picker hidden while only the shipped mode is registered', () => {
+    const b = mount(conversationSnapshot())
+    expect(b.view.queryByRole('button', { name: '渲染方式' })).toBeNull()
+  })
+
+  it('surfaces the picker on the chat tab and switches modes through the store', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, { renderModes: THREE_MODES })
+    const trigger = b.view.getByRole('button', { name: '渲染方式' })
+    fireEvent.click(trigger)
+    expect(b.view.getByRole('menuitem', { name: '原生模式' })).toBeTruthy()
+    expect(b.view.getByRole('menuitem', { name: '经典模式' })).toBeTruthy()
+    expect(b.view.getByRole('menuitem', { name: '思考模式' })).toBeTruthy()
+    fireEvent.click(b.view.getByRole('menuitem', { name: '经典模式' }))
+    expect(b.chat.getSnapshot().renderMode).toBe('classic')
+    expect(b.view.queryByRole('menu')).toBeNull()
+  })
+
+  it('marks the persisted mode and falls back to Native for a stale id', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, { renderModes: THREE_MODES })
+    b.chat.actions.setRenderMode('think')
+    b.rerender()
+    fireEvent.click(b.view.getByRole('button', { name: '渲染方式' }))
+    // The selection marker is a trailing check glyph (Menu's selected row).
+    expect(b.view.getByRole('menuitem', { name: '思考模式' }).querySelector('svg')).toBeTruthy()
+    expect(b.view.getByRole('menuitem', { name: '原生模式' }).querySelector('svg')).toBeNull()
+
+    b.chat.actions.setRenderMode('ghost')
+    b.rerender()
+    expect(b.view.getByRole('button', { name: '渲染方式' })).toBeTruthy()
+  })
+
+  it('keeps the picker on the tab bar across view switches', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, { renderModes: THREE_MODES })
+    expect(b.view.getByRole('button', { name: '渲染方式' })).toBeTruthy()
+    b.chat.actions.setView('trajectory')
+    b.rerender()
+    // The picker stays discoverable on every tab; the mode switch takes
+    // effect when the chat view renders.
+    expect(b.view.getByRole('button', { name: '渲染方式' })).toBeTruthy()
   })
 })

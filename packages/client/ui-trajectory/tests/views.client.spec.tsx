@@ -273,6 +273,11 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         actions={chat.actions}
         renderSlot={() => null}
         views={views}
+        modes={{
+          list: () => [{ id: 'normal', label: 'Native mode' }],
+          subscribe: () => () => {},
+          version: () => 1,
+        }}
         useInput={useInput}
         inputActions={inputActions}
         open={vi.fn()}

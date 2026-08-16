@@ -28,6 +28,8 @@ import { InputBar } from './skeleton/InputBar.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
 import { ChatView } from './chat/ChatView.tsx'
+import { ChatRenderStandard } from './chat/ChatRenderStandard.tsx'
+import { ExecFlowBody, type ExecFlowBodyInjected } from './chat/ExecFlowBody.tsx'
 import { StatsLine } from './chat/StatsLine.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
@@ -165,6 +167,24 @@ export function apply(ctx: Context): void {
     version: () => slots.getVersion('conversation.view'),
   }
 
+  // The chat view's render-mode ledger: same projection shape as `views`,
+  // over the mode ring the chat entry declares below. A mode plugin's
+  // registration appears in the selector live, and a removed mode's id
+  // falls back to the shipped `normal`.
+  const modes = {
+    list: (): ViewTab[] => {
+      const tabs: ViewTab[] = []
+      for (const entry of slots.entries('conversation.chat.render')) {
+        /* v8 ignore next -- unreachable: list registration validates id at load. */
+        if (entry.options.id === undefined) continue
+        tabs.push({ id: entry.options.id, label: resolveSlotLabel(entry.options.label) ?? entry.options.id })
+      }
+      return tabs
+    },
+    subscribe: (fn: () => void) => slots.subscribe('conversation.chat.render', fn),
+    version: () => slots.getVersion('conversation.chat.render'),
+  }
+
   // The per-session input machine registry (SessionInputResolver face; published as
   // ctx.conversation.input by the service below sharing this one instance).
   const inputHub = new InputHub(ctx, t)
@@ -264,6 +284,7 @@ export function apply(ctx: Context): void {
     store: chatStore,
     inject: (): ConversationSessionHeaderInjected => ({
       views,
+      modes,
       open: (id) => { sessions.open(id) },
     }),
   }, ConversationSessionHeader)
@@ -381,6 +402,7 @@ export function apply(ctx: Context): void {
     locale: NS,
     children: {
       'conversation.chat.node': { kind: 'keyed', scope: 'session', inject: CHAT_NODE_INJECT },
+      'conversation.chat.render': { kind: 'list', scope: 'session' },
     },
     store: chatStore,
     inject: (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ChatViewInjected => {
@@ -421,9 +443,44 @@ export function apply(ctx: Context): void {
               // Fork or child-rename failure keeps the source view untouched.
             })
         },
+        modes,
       }
     },
   }, ChatView)
+
+  // The shipped chat render mode: the stock conversation flow. Alternative
+  // modes register into the same ring with their own ids; ChatView's
+  // selector dispatches the active one. The mode body renders through the
+  // chat entry's delegated node seat (owner props), so it declares no
+  // children of its own.
+  slots.register({
+    name: 'conversation.chat.render',
+    id: 'normal',
+    order: 0,
+    label: () => t('chat.render.normal'),
+    locale: NS,
+    store: chatStore,
+  }, ChatRenderStandard)
+
+  // The execflow render modes share one body with a fixed think form:
+  // classic hides reasoning (runs aggregate across steps), think shows it
+  // expanded in the flow (runs stay step-scoped). The Thinking chip in the
+  // running-turn status switches between them via the sibling id.
+  const execflowMode = (id: 'classic' | 'think', thinkForm: 'compact' | 'inline', order: number) =>
+    slots.register({
+      name: 'conversation.chat.render',
+      id,
+      order,
+      label: () => t(id === 'classic' ? 'chat.render.classic' : 'chat.render.think'),
+      locale: NS,
+      store: chatStore,
+      inject: (): ExecFlowBodyInjected => ({
+        thinkForm,
+        siblingId: id === 'classic' ? 'think' : 'classic',
+      }),
+    }, ExecFlowBody)
+  execflowMode('classic', 'compact', 10)
+  execflowMode('think', 'inline', 20)
 
   // Session stats stick with the composer (composer.dock = stats-line family).
   slots.register({ name: 'conversation.composer.dock', id: 'stats', order: 0, locale: NS }, StatsLine)

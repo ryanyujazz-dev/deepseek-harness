@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Queue+coalesce controller for the ExecutionSlot header swap animation.
  *
  * Which swaps animate (slide-up-fade-out / slide-down-fade-in, the prototype

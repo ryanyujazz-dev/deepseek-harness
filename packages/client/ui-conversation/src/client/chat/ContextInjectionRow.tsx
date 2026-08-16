@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import clsx from 'clsx'
 import type { ContextMessageNode } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { DisclosureRow, IconBrowseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -13,6 +14,9 @@ export interface ContextInjectionRowProps {
   provenance: ContextMessageNode['provenance']
   /** Producer-declared information form; null renders the opaque body. */
   form: ContextMessageNode['form']
+  /** ExecFlow row chrome: the expanded body carries the icon-axis rail
+   * (set by the execflow render modes through the node owner's think form). */
+  execflow?: boolean | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -28,7 +32,7 @@ export interface ContextInjectionRowProps {
  * @param props - Durable content, its projected producer role/name and form, and the locale seat.
  * @returns A collapsed context row with a bounded, form-specific body.
  */
-export function ContextInjectionRow({ content, source, provenance, form, t }: ContextInjectionRowProps) {
+export function ContextInjectionRow({ content, source, provenance, form, execflow, t }: ContextInjectionRowProps) {
   const [open, setOpen] = useState(false)
   // Resolved rather than declared: a form whose fields are unreadable renders
   // the opaque body, and the marker must say what the row actually shows.
@@ -36,7 +40,7 @@ export function ContextInjectionRow({ content, source, provenance, form, t }: Co
 
   return (
     <DisclosureRow
-      className={css.root}
+      className={clsx(css.root, execflow === true && css.execflow)}
       icon={<IconBrowseOutline16 size={14} />}
       chevronClassName={css.chevron}
       title={t(provenance.role === 'recall' ? 'message.contextRecall' : 'message.contextInjection')}
